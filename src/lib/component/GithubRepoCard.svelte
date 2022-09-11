@@ -14,7 +14,7 @@
 <div class="card shadow-lg is-cursor-pointer">
     <div class="card-image cover-image is-overflow-hidden">
         <figure class="image">
-        <img src="https://source.unsplash.com/user/himiwaybikes" alt="Placeholder image">
+        <img src="https://picsum.photos/200" alt="Placeholder image">
         </figure>
     </div>
     <div class="card-content">
