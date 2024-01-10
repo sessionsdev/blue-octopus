@@ -1,0 +1,8 @@
+
+{{ define "content" }}
+    <h1>Hello World!</h1>
+    <button hx-get="/api/hello-world" hx-trigger="click" hx-target="#content" hx-swap="beforeend">
+        Add Hello World
+    </button>
+    <div id="content"></div>
+{{ end }}
