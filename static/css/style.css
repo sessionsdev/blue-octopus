@@ -7,13 +7,14 @@ body {
     background-color: #f4f4f4;
 }
 
-/* Add a background image to the body */
+/* Add a background image to the body
 body {
-    background-image: url('/static/images/background.png'); /* Adjust the path as needed */
-    background-size: cover; /* Cover the entire page */
+    background-image: url('/static/images/background.png');
+    background-size: cover; 
     background-position: center;
-    background-attachment: fixed; /* Fixed background */
+    background-attachment: fixed;
 }
+*/
 
 /* Style for the main header */
 h1 {
