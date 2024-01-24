@@ -1,23 +1,15 @@
 package handlers
 
 import (
-	"html/template"
 	"net/http"
-	"path/filepath"
+    "github.com/sessionsdev/blue-octopus/internal/templatemanager"
 )
 
-func ServeHome(w http.ResponseWriter, r *http.Request) {
-    tmpl, err := template.ParseFiles(
-        filepath.Join("templates", "base.html"),
-        filepath.Join("templates", "home.html"),
-    )
-
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
-
-    if err := tmpl.ExecuteTemplate(w, "base", nil); err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+func ServeHome(tmplManager *templatemanager.TemplateManager) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        err := tmplManager.ExecuteTemplate(w, "base", nil)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
     }
 }

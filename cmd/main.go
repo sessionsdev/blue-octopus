@@ -1,23 +1,25 @@
 package main
 
-	
-
 import (
-    "fmt"
-    "net/http"
-    "github.com/sessionsdev/blue-octopus/internal/handlers"
-    "path/filepath"
+	"fmt"
+	"net/http"
+	"path/filepath"
+    "github.com/sessionsdev/blue-octopus/internal/templatemanager"
+	"github.com/sessionsdev/blue-octopus/internal/handlers"
 )
 
 	
 
+
 func main() {
-    http.HandleFunc("/", handlers.ServeHome)
+    tmplManager := templatemanager.NewTemplateManager("./templates")
+
+    http.HandleFunc("/", handlers.ServeHome(tmplManager))
     http.HandleFunc("/api/hello-world", handlers.ServeHelloWorldAPI)
 
     // Handle static files
     
-    staticPath := filepath.Join("../..", "static")
+    staticPath := filepath.Join(".", "static")
     absStaticPath, _ := filepath.Abs(staticPath)
     fmt.Println("Serving static files from:", absStaticPath)
 
