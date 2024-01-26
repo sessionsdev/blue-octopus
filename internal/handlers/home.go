@@ -1,15 +1,32 @@
 package handlers
 
 import (
+	"html/template"
 	"net/http"
-    "github.com/sessionsdev/blue-octopus/internal/templatemanager"
 )
 
-func ServeHome(tmplManager *templatemanager.TemplateManager) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        err := tmplManager.ExecuteTemplate(w, "base", nil)
-        if err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-        }
-    }
+// ServeHome serves the home page
+func ServeHome(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("templates/base.html", "templates/home.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = tmpl.ExecuteTemplate(w, "base", nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// ServeAbout serves the about page
+func ServeAbout(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("templates/base.html", "templates/about.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = tmpl.ExecuteTemplate(w, "base", nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
