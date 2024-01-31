@@ -11,3 +11,36 @@ footer {
     background-color: #f5f5f5;
     padding: 25px;
 }
+
+.nav-wrapper {
+    display: flex;
+    justify-content: space-between;
+    background-color: #333;
+    color: white;
+    padding: 14px 16px;
+}
+
+.company-name {
+    font-size: 1.5em;
+}
+
+.nav-links {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+}
+
+.nav-links li {
+    margin-left: 15px;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+}
+
+.nav-links a:hover {
+    background-color: #111;
+}
+

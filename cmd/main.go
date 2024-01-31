@@ -11,6 +11,7 @@ import (
 func main() {
 	http.HandleFunc("/", handlers.ServeHome)
 	http.HandleFunc("/about", handlers.ServeAbout)
+	http.HandleFunc("/test", handlers.ServeTestPage)
 	http.HandleFunc("/api/hello-world", handlers.ServeHelloWorldAPI)
 	http.HandleFunc("/api/generate-text", handlers.GenerateNewText)
 
