@@ -1,8 +1,30 @@
 {{ define "title" }}Test{{ end }}
 {{ define "main" }}
 
-<div>
-    <h1>TEST PAGE</h1>
+
+<div id="game-container">
+    <div class="game-area"> <!-- This div wraps game output and state panel for side-by-side layout -->
+        <div id="game-output">
+            <p>You start in a forest clearing. There is a path to the north. A bear is sleeping nearby.</p>
+        </div>
+        <div id="game-state-panel">
+            <ul>
+                <li>Health: 10</li>
+                <li>Inventory:
+                    <ul>
+                        <li>Lantern</li>
+                        <li>Sword</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div> <!-- End of game-area div -->
+    <form hx-post="/api/process-command" hx-target="#game-output" hx-swap="innerHTML">
+        <input type="text" name="command" id="command-input" placeholder="Enter your command (Go {DIRECTION}, Take {ITEM}, Attack {ENEMY}....)" autocomplete="off">
+        <button type="submit">Send</button>
+
+    </form>
 </div>
+
 
 {{end}}

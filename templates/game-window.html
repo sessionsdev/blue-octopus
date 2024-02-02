@@ -1,15 +1,12 @@
 {{ define "main" }}
 
-<div class="container">
-    <div class="output">
-        <p>Text Output</p>
-    </div>
-    <div class="buttons">
-        <button class="button" hx-get="/north">North</button>
-        <button class="button" hx-get="/south">South</button>
-        <button class="button" hx-get="/east">East</button>
-        <button class="button" hx-get="/west">West</button>
-    </div>
+<div id="container">
+    <div id="main-output" hx-get="/initial-game-state" hx-trigger="load" hx-swap="innerHTML"></div>
+    <div id="game-state-panel"></div>
+    <form hx-post="/process-command" hx-target="#main-output" hx-swap="innerHTML">
+        <input type="text" name="command" id="command-input" placeholder="Enter your command..." autocomplete="off">
+        <button type="submit">Send</button>
+    </form>
 </div>
 
 {{ end  }}

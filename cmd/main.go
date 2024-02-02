@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 
@@ -13,7 +14,7 @@ func main() {
 	http.HandleFunc("/about", handlers.ServeAbout)
 	http.HandleFunc("/test", handlers.ServeTestPage)
 	http.HandleFunc("/api/hello-world", handlers.ServeHelloWorldAPI)
-	http.HandleFunc("/api/generate-text", handlers.GenerateNewText)
+	http.HandleFunc("/api/process-command", handlers.HandleGameCommand)
 
 	// handle static files
 	staticPath := filepath.Join(".", "static")
@@ -21,5 +22,5 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	fmt.Println("Server is running at http://localhost:8090")
-	http.ListenAndServe(":8090", nil)
+	log.Fatal(http.ListenAndServe(":8090", nil))
 }

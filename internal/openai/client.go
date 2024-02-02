@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -16,9 +18,14 @@ type Message struct {
 
 // ChatRequest is the request payload for the Chat API.
 type ChatRequest struct {
-	Model       string    `json:"model"`
-	Messages    []Message `json:"messages"`
-	Temperature float64   `json:"temperature"`
+	Model          string         `json:"model"`
+	Messages       []Message      `json:"messages"`
+	Temperature    float64        `json:"temperature"`
+	ResponseFormat ResponseFormat `json:"response_format"`
+}
+
+type ResponseFormat struct {
+	Type string `json:"type"`
 }
 
 // Choice represents a single choice in the OpenAI response.
@@ -47,27 +54,36 @@ type OpenAIResponse struct {
 	Usage             Usage    `json:"usage"`
 }
 
-type OpenAIClient struct {
-	Client *http.Client
-	APIKey string
-	URL    string
+func (resp *OpenAIResponse) GetFirstChoice() string {
+	return resp.Choices[0].Message.Content
 }
 
-func New(apiKey, url string) *OpenAIClient {
+type OpenAIClient struct {
+	Client         *http.Client
+	APIKey         string
+	Model          string
+	Temperature    float64
+	ResponseFormat ResponseFormat
+}
+
+func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClient {
 	return &OpenAIClient{
 		Client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		APIKey: apiKey,
-		URL:    url,
+		APIKey:         os.Getenv("OPENAI_API_KEY"),
+		Model:          model,
+		Temperature:    temp,
+		ResponseFormat: responseFormat,
 	}
 }
 
-func (c *OpenAIClient) CallOpenAIChat(model, userMessage string, temperature float64) (OpenAIResponse, error) {
+func (c *OpenAIClient) CallOpenAIChat(userMessages []Message) (OpenAIResponse, error) {
 	chatRequest := ChatRequest{
-		Model:       model,
-		Messages:    []Message{{Role: "user", Content: userMessage}},
-		Temperature: temperature,
+		Model:          "gpt-4-0125-preview",
+		Messages:       userMessages,
+		Temperature:    0.7,
+		ResponseFormat: ResponseFormat{Type: "json_object"},
 	}
 
 	requestBody, err := json.Marshal(chatRequest)
@@ -75,7 +91,9 @@ func (c *OpenAIClient) CallOpenAIChat(model, userMessage string, temperature flo
 		return OpenAIResponse{}, fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.URL, bytes.NewBuffer(requestBody))
+	url := "https://api.openai.com/v1/chat/completions"
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return OpenAIResponse{}, fmt.Errorf("error creating request: %w", err)
 	}
@@ -89,13 +107,20 @@ func (c *OpenAIClient) CallOpenAIChat(model, userMessage string, temperature flo
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		// print response body
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		log.Printf("response body: %s", buf.String())
 		return OpenAIResponse{}, fmt.Errorf("received non-OK response status: %s", resp.Status)
 	}
 
-	var result OpenAIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	var openAiResponse OpenAIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&openAiResponse); err != nil {
 		return OpenAIResponse{}, fmt.Errorf("error decoding response: %w", err)
 	}
 
-	return result, nil
+	// print total tokens used
+	fmt.Printf("Total tokens used: %d\n", openAiResponse.Usage.TotalTokens)
+
+	return openAiResponse, nil
 }
