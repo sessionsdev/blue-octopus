@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/sessionsdev/blue-octopus/internal/game"
 	"github.com/sessionsdev/blue-octopus/internal/openai"
 )
 
@@ -12,39 +13,18 @@ type Command struct {
 	Command string `json:"command"`
 }
 
-type GameStateSystemPrompt struct {
-	Context string    `json:"context"`
-	State   GameState `json:"gameState"`
-}
-
-type GameState struct {
-	CharacterName     string   `json:"characterName"`
-	CurrentLocation   string   `json:"currentLocation"`
-	Inventory         []string `json:"inventory"`
-	PreviousLocations []string `json:"previousLocations"`
-	EnemiesInLocation []string `json:"enemiesInLocation"`
+type GameStatePromptDetails struct {
+	CurrentLocation   *game.Location `json:"current_location"`
+	Inventory         []string       `json:"inventory"`
+	EnemiesInLocation []string       `json:"enemies_in_location"`
 }
 
 type OpenAiGameResponse struct {
-	Response             string    `json:"response"`
-	ProposedStateChanges GameState `json:"proposedStateChanges"`
+	Response             string                    `json:"response"`
+	ProposedStateChanges game.ProposedStateChanges `json:"proposed_state_changes"`
 }
 
-func (gs *GameState) JsonString() string {
-	jsonData, err := json.Marshal(gs)
-	if err != nil {
-		return ""
-	}
-	return "gameState: " + string(jsonData)
-}
-
-var state = GameState{
-	CharacterName:     "Bob",
-	CurrentLocation:   "The Forest",
-	Inventory:         []string{"sword", "shield"},
-	PreviousLocations: []string{"The Town", "The Tavern"},
-	EnemiesInLocation: []string{"goblin", "troll"},
-}
+var newGame = game.InitializeNewGame()
 
 var gameMessageHistory = []openai.Message{}
 
@@ -74,45 +54,85 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("<p>" + gameUpdate.Response + "</p>"))
 }
 
-func processGameCommand(command string) (OpenAiGameResponse, error) {
-	gameMessages := []openai.Message{
+func HandleGameState(w http.ResponseWriter, r *http.Request) {
+	// For GET requests, return the current full game state
+	if r.Method == http.MethodGet {
+		w.Header().Set("Content-Type", "application/json")
+		newGameJson, err := json.Marshal(newGame)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		w.Write(newGameJson)
+		return
+	}
+}
+
+func getPrefixMessages() []openai.Message {
+	return []openai.Message{
 		{
 			Role: "system",
-			Content: `You are the narrator of a text-based adventure game. ` +
+			Content: `You are the game master of a text-based adventure game. ` +
 				`You are in control of the game's story and the world in which it takes place. ` +
 				`You can create new locations, enemies, and items, and you can describe the game's world to the player ` +
-				`and present puzzles, riddles and challenges, You can also respond to the player's commands and questions. ` +
-				`The game's state will be passed to each time along with the players command.`,
+				`and present puzzles, riddles and challenges, You can also respond to the player's commands and questions. `,
 		},
 		{
 			Role: "system",
-			Content: `Always respond in the format a json object 'response:' key with the chat completion, ` +
-				`and a 'proposeStateChanges:' key with nested json object of the proposed state changes with the following schema: ` +
+			Content: `Always respond in the format a json object in the following format:, ` +
 				`
 				{
-					"characterName": "Character's Name",
-					"currentLocation": "Current Location",
-					"inventory": ["item1", "item2", "item3"],
-					"previousLocations": ["location1", "location2"],
-					"enemiesInLocation": ["enemy1", "enemy2"]
+					"response": "You enter the Small Room. You see a chest and a door, and a sword.  There is a shadowy figure What would you like to do?"
+					"proposed_state_changes": {
+						"current_location_name": "Small Room",
+						"interactive_objects_in_location": ["chest", "door"],
+						"removable_items": ["sword"],
+						"updated_enemies_in_location": ["shadowy figure"],
+						"player_inventory": ["potion"]
+					}
+				}
+
+				Another example:
+				{
+					"response": "Opened the chest and take the sword inside before dispatching the shadowy figure. The door opens. What would you like to do next?"
+					"proposed_state_changes": {
+						"current_location_name": "Small Room",
+						"interactive_objects_in_location": ["chest", "door"],
+						"updated_removable_items": [],
+						"enemies_in_location": [],
+						"player_inventory": ["potion", "sword"]
+					}
+				}
+
+				Another example:
+				{
+					"response": "You go through the door.  On the other side of the door is the Library.  There's a book on the table. What would you like to do next?"
+					"proposed_state_changes": {
+						"current_location_name": "Library",
+						"interactive_objects_in_location": ["book"],
+						"removable_items": [],
+						"enemies_in_location": [],
+						"player_inventory": ["potion", "sword"]
+					}
 				}
 				`,
 		},
-		{
-			Role:    "system",
-			Content: state.JsonString(),
-		},
 	}
+}
 
+func getCurrentGameStateMessage() openai.Message {
+	return openai.Message{
+		Role:    "system",
+		Content: newGame.GetPartialJsonRepresentation(),
+	}
+}
+
+func processGameCommand(command string) (OpenAiGameResponse, error) {
+	gameMessages := getPrefixMessages()
+	gameMessages = append(gameMessages, getCurrentGameStateMessage())
 	gameMessages = append(gameMessages, gameMessageHistory...)
 
 	userMessage := openai.Message{Role: "user", Content: command}
 	gameMessages = append(gameMessages, userMessage)
-
-	// print the game messages with role
-	for _, message := range gameMessages {
-		fmt.Printf("%s: %s\n\n", message.Role, message.Content)
-	}
 
 	// Call the OpenAI Chat API using the client
 	response, err := client.CallOpenAIChat(gameMessages)
@@ -120,11 +140,11 @@ func processGameCommand(command string) (OpenAiGameResponse, error) {
 		return OpenAiGameResponse{}, fmt.Errorf("error calling OpenAI Chat API: %w", err)
 	}
 
-	// print full response
-	fmt.Printf("Full Response: %+v\n", response)
-
 	// get the raw response message
 	responseMessage := response.GetFirstChoice()
+
+	// print the response message
+	fmt.Printf("Response: %s\n\n", responseMessage)
 
 	// turn responseMessage into a OpenAiGameResponse
 	var gameResponse OpenAiGameResponse
@@ -135,19 +155,13 @@ func processGameCommand(command string) (OpenAiGameResponse, error) {
 
 	assistentResponse := openai.Message{Role: "assistant", Content: gameResponse.Response}
 	proposedStateChanges := gameResponse.ProposedStateChanges
-	//print the proposed state changes
-	fmt.Printf("Proposed State Changes: %+v\n", proposedStateChanges)
+
+	// print the proposed state changes
+	fmt.Printf("Proposed State Changes: %+v\n\n", proposedStateChanges)
 
 	gameMessageHistory = append(gameMessageHistory, userMessage)
 	gameMessageHistory = append(gameMessageHistory, assistentResponse)
+	newGame.UpdateGameState(proposedStateChanges, response.Usage.TotalTokens)
 
 	return gameResponse, nil
-}
-
-func resolveStateChanges(proposedStateChanges GameState) {
-	// update the game state
-	state.CurrentLocation = proposedStateChanges.CurrentLocation
-	state.Inventory = proposedStateChanges.Inventory
-	state.PreviousLocations = proposedStateChanges.PreviousLocations
-	state.EnemiesInLocation = proposedStateChanges.EnemiesInLocation
 }

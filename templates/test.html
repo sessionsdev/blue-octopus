@@ -19,7 +19,12 @@
             </ul>
         </div>
     </div> <!-- End of game-area div -->
-    <form hx-post="/api/process-command" hx-target="#game-output" hx-swap="innerHTML">
+    <form 
+        hx-post="/api/process-command" 
+        hx-target="#game-output" 
+        hx-swap="beforeend" 
+        hx-on::before-request="this.reset()"
+        >
         <input type="text" name="command" id="command-input" placeholder="Enter your command (Go {DIRECTION}, Take {ITEM}, Attack {ENEMY}....)" autocomplete="off">
         <button type="submit">Send</button>
 
