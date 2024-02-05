@@ -14,6 +14,7 @@ func main() {
 	http.HandleFunc("/about", handlers.ServeAbout)
 	http.HandleFunc("/test", handlers.ServeTestPage)
 	http.HandleFunc("/api/game-state", handlers.HandleGameState)
+	http.HandleFunc("/api/location-tree", handlers.HandleWorldTreeVisualization)
 	http.HandleFunc("/api/hello-world", handlers.ServeHelloWorldAPI)
 	http.HandleFunc("/api/process-command", handlers.HandleGameCommand)
 

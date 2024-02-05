@@ -158,7 +158,7 @@ a:hover {
     background-color: white;
     border: 1px solid #ccc;
     padding: 15px;
-    height: 300px; /* Fixed height to maintain layout */
+    height: 500px; /* Fixed height to maintain layout */
     overflow-y: auto; /* Allows scrolling for overflow text */
 }
 
@@ -167,7 +167,7 @@ a:hover {
     background-color: white;
     border: 1px solid #ccc;
     padding: 15px;
-    height: 300px; /* Match height with game output */
+    height: 500px; /* Match height with game output */
     overflow-y: auto; /* Allows scrolling for overflow content */
 }
 

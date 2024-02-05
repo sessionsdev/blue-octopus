@@ -10,10 +10,42 @@ import (
 	"time"
 )
 
+var Client *OpenAIClient
+
+func init() {
+	Client = New(
+		"gpt-3.5-turbo-0125",
+		0.7,
+		ResponseFormat{Type: "json_object"},
+	)
+
+}
+
+func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClient {
+	return &OpenAIClient{
+		Client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		ClientName:     "openai",
+		APIKey:         os.Getenv("OPENAI_API_KEY"),
+		Model:          model,
+		Temperature:    temp,
+		ResponseFormat: responseFormat,
+	}
+}
+
 // Message represents a single message in the conversation.
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+func (m Message) Provider() string {
+	return m.Role
+}
+
+func (m Message) Message() string {
+	return m.Content
 }
 
 // ChatRequest is the request payload for the Chat API.
@@ -54,36 +86,29 @@ type OpenAIResponse struct {
 	Usage             Usage    `json:"usage"`
 }
 
-func (resp *OpenAIResponse) GetFirstChoice() string {
+func (resp *OpenAIResponse) GetFirstMessage() Message {
+	return resp.Choices[0].Message
+}
+
+func (resp *OpenAIResponse) GetFirstChoiceContent() string {
 	return resp.Choices[0].Message.Content
 }
 
 type OpenAIClient struct {
 	Client         *http.Client
+	ClientName     string
 	APIKey         string
 	Model          string
 	Temperature    float64
 	ResponseFormat ResponseFormat
 }
 
-func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClient {
-	return &OpenAIClient{
-		Client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		APIKey:         os.Getenv("OPENAI_API_KEY"),
-		Model:          model,
-		Temperature:    temp,
-		ResponseFormat: responseFormat,
-	}
-}
-
 func (c *OpenAIClient) CallOpenAIChat(userMessages []Message) (OpenAIResponse, error) {
 	chatRequest := ChatRequest{
-		Model:          "gpt-4-0125-preview",
+		Model:          c.Model,
 		Messages:       userMessages,
-		Temperature:    0.7,
-		ResponseFormat: ResponseFormat{Type: "json_object"},
+		Temperature:    c.Temperature,
+		ResponseFormat: c.ResponseFormat,
 	}
 
 	requestBody, err := json.Marshal(chatRequest)
@@ -118,9 +143,6 @@ func (c *OpenAIClient) CallOpenAIChat(userMessages []Message) (OpenAIResponse, e
 	if err := json.NewDecoder(resp.Body).Decode(&openAiResponse); err != nil {
 		return OpenAIResponse{}, fmt.Errorf("error decoding response: %w", err)
 	}
-
-	// print total tokens used
-	fmt.Printf("Total tokens used: %d\n", openAiResponse.Usage.TotalTokens)
 
 	return openAiResponse, nil
 }
