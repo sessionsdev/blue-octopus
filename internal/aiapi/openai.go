@@ -1,4 +1,4 @@
-package openai
+package aiapi
 
 import (
 	"bytes"
@@ -14,11 +14,16 @@ var Client *OpenAIClient
 
 func init() {
 	Client = New(
-		"gpt-3.5-turbo-0125",
+		"gpt-4-0125-preview",
 		0.7,
 		ResponseFormat{Type: "json_object"},
 	)
 
+}
+
+var models = []string{
+	"gpt-3.5-turbo-0125",
+	"gpt-4-0125-preview",
 }
 
 func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClient {
@@ -34,26 +39,26 @@ func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClien
 	}
 }
 
-// Message represents a single message in the conversation.
-type Message struct {
+// OpenAiMessage represents a single message in the conversation.
+type OpenAiMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-func (m Message) Provider() string {
+func (m OpenAiMessage) Provider() string {
 	return m.Role
 }
 
-func (m Message) Message() string {
+func (m OpenAiMessage) Message() string {
 	return m.Content
 }
 
 // ChatRequest is the request payload for the Chat API.
 type ChatRequest struct {
-	Model          string         `json:"model"`
-	Messages       []Message      `json:"messages"`
-	Temperature    float64        `json:"temperature"`
-	ResponseFormat ResponseFormat `json:"response_format"`
+	Model          string          `json:"model"`
+	Messages       []OpenAiMessage `json:"messages"`
+	Temperature    float64         `json:"temperature"`
+	ResponseFormat ResponseFormat  `json:"response_format"`
 }
 
 type ResponseFormat struct {
@@ -63,7 +68,7 @@ type ResponseFormat struct {
 // Choice represents a single choice in the OpenAI response.
 type Choice struct {
 	Index        int              `json:"index"`
-	Message      Message          `json:"message"`
+	Message      OpenAiMessage    `json:"message"`
 	Logprobs     *json.RawMessage `json:"logprobs"` // Use *json.RawMessage for nullability
 	FinishReason string           `json:"finish_reason"`
 }
@@ -86,7 +91,7 @@ type OpenAIResponse struct {
 	Usage             Usage    `json:"usage"`
 }
 
-func (resp *OpenAIResponse) GetFirstMessage() Message {
+func (resp *OpenAIResponse) GetFirstMessage() OpenAiMessage {
 	return resp.Choices[0].Message
 }
 
@@ -103,7 +108,7 @@ type OpenAIClient struct {
 	ResponseFormat ResponseFormat
 }
 
-func (c *OpenAIClient) CallOpenAIChat(userMessages []Message) (OpenAIResponse, error) {
+func (c *OpenAIClient) CallOpenAIChat(userMessages []OpenAiMessage) (OpenAIResponse, error) {
 	chatRequest := ChatRequest{
 		Model:          c.Model,
 		Messages:       userMessages,

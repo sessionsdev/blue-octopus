@@ -1,13 +1,22 @@
 package game
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 	"unicode"
+
+	"github.com/sessionsdev/blue-octopus/internal/aiapi"
+	"github.com/sessionsdev/blue-octopus/internal/redis"
 )
+
+func init() {
+	gob.Register(aiapi.OpenAiMessage{})
+}
 
 func (g *Game) AppendToMessageHistory(message GameMessage) {
 	g.GameMessageHistory = append(g.GameMessageHistory, message)
@@ -17,7 +26,7 @@ func (g *Game) UpdateGameState(userMessage GameMessage, stateUpdate GameUpdate, 
 	g.handleLocationUpdate(stateUpdate)
 
 	if stateUpdate.ProposedStateChanges.UpdatedPlayerInventory != nil {
-		stateUpdate.ProposedStateChanges.UpdatedPlayerInventory = g.Player.Inventory
+		g.Player.Inventory = stateUpdate.ProposedStateChanges.UpdatedPlayerInventory
 		log.Println("Updated Inventory: ", g.Player.Inventory)
 	}
 
@@ -48,7 +57,7 @@ func (g *Game) handleLocationUpdate(stateUpdate GameUpdate) {
 				EnemiesInLocation: []string{},
 				RemovableItems:    []string{},
 				InteractiveItems:  []string{},
-				AdjacentLocations: []*Location{g.World.CurrentLocation},
+				AdjacentLocations: []string{g.World.CurrentLocation.LocationName},
 			}
 
 			g.World.Locations[normalized] = locationToUpdate
@@ -86,7 +95,7 @@ func (g *Game) handleLocationUpdate(stateUpdate GameUpdate) {
 					EnemiesInLocation: []string{},
 					RemovableItems:    []string{},
 					InteractiveItems:  []string{},
-					AdjacentLocations: []*Location{locationToUpdate},
+					AdjacentLocations: []string{locationToUpdate.LocationName},
 				}
 
 				// add the new location to the world
@@ -96,7 +105,7 @@ func (g *Game) handleLocationUpdate(stateUpdate GameUpdate) {
 	}
 
 	g.World.UpdateCurrentLocation(locationToUpdate)
-	jsonOutput, err := json.MarshalIndent(g.World.CurrentLocation.getLocationJson(), "", "  ")
+	jsonOutput, err := json.MarshalIndent(g.World.CurrentLocation, "", "  ")
 	if err != nil {
 		log.Printf("JSON marshalling failed: %s", err)
 	} else {
@@ -163,7 +172,7 @@ func buildInitialWorldLocations() map[string]*Location {
 			"Mailbox",
 			"Borded Door",
 		},
-		AdjacentLocations: []*Location{},
+		AdjacentLocations: []string{},
 	}
 
 	riverLocation := &Location{
@@ -174,8 +183,8 @@ func buildInitialWorldLocations() map[string]*Location {
 			"Boat",
 			"Fish",
 		},
-		AdjacentLocations: []*Location{
-			blueHouse,
+		AdjacentLocations: []string{
+			blueHouse.LocationName,
 		},
 	}
 
@@ -187,12 +196,12 @@ func buildInitialWorldLocations() map[string]*Location {
 			"Sign",
 			"Tree",
 		},
-		AdjacentLocations: []*Location{
-			blueHouse,
+		AdjacentLocations: []string{
+			blueHouse.LocationName,
 		},
 	}
 
-	blueHouse.AdjacentLocations = append(blueHouse.AdjacentLocations, riverLocation, theRoadLocation)
+	blueHouse.AdjacentLocations = append(blueHouse.AdjacentLocations, riverLocation.LocationName, theRoadLocation.LocationName)
 
 	locations := make(map[string]*Location)
 	locations[theRoadLocation.getNormalizedName()] = theRoadLocation
@@ -243,7 +252,7 @@ func (g *Game) BuildGameStatePromptDetails() GameStatePromptDetails {
 
 	adjacentLocationNames := make([]string, len(currentLocation.AdjacentLocations))
 	for i, location := range currentLocation.AdjacentLocations {
-		adjacentLocationNames[i] = location.LocationName
+		adjacentLocationNames[i] = location
 	}
 
 	return GameStatePromptDetails{
@@ -285,4 +294,52 @@ type GameStateResponseDetails struct {
 	UpdatedRemovableItemsInLocation     []string `json:"updated_removable_items_in_location"`
 	UpdatedPlayerInventory              []string `json:"updated_player_inventory"`
 	NewStoryThreads                     []string `json:"new_story_threads"`
+}
+
+func (g *Game) encodeGame() []byte {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(g)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return buf.Bytes()
+}
+
+func decodeGame(encodedGame []byte) *Game {
+	dec := gob.NewDecoder(bytes.NewReader(encodedGame))
+	var game Game
+	err := dec.Decode(&game)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return &game
+}
+
+func (g *Game) SaveGameToRedis() {
+	log.Printf("Saving game to redis: %s", g.GameId)
+
+	encodedGame := g.encodeGame()
+	err := redis.SetGob(g.GameId, encodedGame, 0)
+	if err != nil {
+		log.Printf("Error saving game to redis: %s", g.GameId)
+	}
+}
+
+func LoadGameFromRedis(gameId string) (*Game, error) {
+	log.Printf("Loading game from redis: %s", gameId)
+
+	encodedGame, err := redis.GetGob(gameId)
+	if err != nil {
+		if _, ok := err.(*redis.NotFoundError); ok {
+			return nil, err
+		} else if err != nil {
+			log.Printf("Error loading game from redis: %s", gameId)
+			log.Fatal(err)
+		}
+	}
+
+	return decodeGame(encodedGame), nil
 }

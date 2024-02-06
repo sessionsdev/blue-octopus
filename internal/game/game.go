@@ -18,30 +18,6 @@ type Game struct {
 	TotalTokensUsed    int           `json:"total_tokens_used"`
 }
 
-type GameJson struct {
-	GameId             string        `json:"game_id"`
-	World              WorldJson     `json:"world"`
-	Player             *Player       `json:"player"`
-	CentralPlot        string        `json:"central_plot"`
-	StoryThreads       []string      `json:"story_threads"`
-	SetupMessage       GameMessage   `json:"setup_message"`
-	GameMessageHistory []GameMessage `json:"game_message_history"`
-	TotalTokensUsed    int           `json:"total_tokens_used"`
-}
-
-func (g *Game) GetGameJson() GameJson {
-	return GameJson{
-		GameId:             g.GameId,
-		World:              g.World.GetWorldJson(),
-		Player:             g.Player,
-		CentralPlot:        g.CentralPlot,
-		StoryThreads:       g.StoryThreads,
-		SetupMessage:       g.SetupMessage,
-		GameMessageHistory: g.GameMessageHistory,
-		TotalTokensUsed:    g.TotalTokensUsed,
-	}
-}
-
 func (g *Game) BuildCurrentContext(state GameMessage, userPrompt GameMessage) []GameMessage {
 	context := []GameMessage{g.SetupMessage, state}
 

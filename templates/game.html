@@ -1,0 +1,37 @@
+{{ define "title" }}AI Adventures{{ end }}
+{{ define "main" }}
+
+
+<div id="game-container">
+    <div class="game-area"> <!-- This div wraps game output and state panel for side-by-side layout -->
+        <div id="game-output">
+            <p>
+                You are standing in an open field west of a blue house, with a boarded front door. There is a small mailbox here.
+            </p>
+        </div>
+        <div id="game-state-panel" hx-get="/api/stats-display" hx-trigger="stats-update from:body" hx-swap="innerHTML">
+            <p>Welcome to Adventure AI.  A text based Adventure Game</p>
+
+            <p>
+                Interact with the game by typing commands into the input box below.  
+                For example, you can type "Go North" to move in that direction, 
+                "Take Sword" to pick up an item, or "Attack Bear" to attack an enemy.
+            </p>
+
+
+        </div>
+    </div> <!-- End of game-area div -->
+    <form 
+        hx-post="/api/process-command" 
+        hx-target="#game-output" 
+        hx-swap="beforeend" 
+        hx-on::before-request="this.reset()"
+        >
+        <input type="text" name="command" id="command-input" placeholder="Enter your command (Go to {LOCATION}, Take {ITEM}, Attack {ENEMY}....)" autocomplete="off">
+        <button type="submit">Send</button>
+
+    </form>
+</div>
+
+
+{{end}}

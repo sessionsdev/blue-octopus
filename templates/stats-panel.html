@@ -1,0 +1,16 @@
+<p><strong>Location:</strong></p>
+<p>{{.Location}}</p>
+
+<p><strong>Inventory:</strong></p>
+<ul>
+{{range .Inventory}}
+    <li>{{.}}</li>
+{{end}}
+</ul>
+
+<p><strong>Enemies:</strong></p>
+<ul>
+{{range .Enemies}}
+    <li>{{.}}</li>
+{{end}}
+</ul>

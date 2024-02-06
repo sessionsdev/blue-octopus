@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/sessionsdev/blue-octopus/internal/openai"
+	"github.com/sessionsdev/blue-octopus/internal/aiapi"
 )
 
-func (newGame *Game) ProcessGameCommand(command string) (GameUpdate, error) {
-	userMessage := openai.Message{Role: "user", Content: command}
+func (g *Game) ProcessGameCommand(command string) (GameUpdate, error) {
+	userMessage := aiapi.OpenAiMessage{Role: "user", Content: command}
 
-	messages := newGame.BuildCurrentContext(
-		getCurrentGameStateMessage(newGame),
+	messages := g.BuildCurrentContext(
+		getCurrentGameStateMessage(g),
 		userMessage,
 	)
 
@@ -33,34 +33,48 @@ func (newGame *Game) ProcessGameCommand(command string) (GameUpdate, error) {
 
 	log.Printf("Game Response: %+v", gameResponse)
 
-	assistantMessage := openai.Message{Role: "assistant", Content: gameResponse.Response}
+	assistantMessage := aiapi.OpenAiMessage{Role: "assistant", Content: gameResponse.Response}
 
-	newGame.UpdateGameState(userMessage, gameResponse, response.Usage.TotalTokens, assistantMessage)
+	g.UpdateGameState(userMessage, gameResponse, response.Usage.TotalTokens, assistantMessage)
 
 	return gameResponse, nil
 }
 
-func callClient(clientName string, messages []GameMessage) (openai.OpenAIResponse, error) {
+func callClient(clientName string, messages []GameMessage) (aiapi.OpenAIResponse, error) {
 	switch clientName {
 	case "openai":
-		openAiMessages := make([]openai.Message, len(messages))
+		openAiMessages := make([]aiapi.OpenAiMessage, len(messages))
 		for i, message := range messages {
 			if message != nil {
-				openAiMessages[i] = message.(openai.Message)
+				openAiMessages[i] = message.(aiapi.OpenAiMessage)
 			}
 		}
 
-		return openai.Client.CallOpenAIChat(openAiMessages)
+		return aiapi.Client.CallOpenAIChat(openAiMessages)
 	default:
-		return openai.OpenAIResponse{}, fmt.Errorf("unknown client: %s", clientName)
+		return aiapi.OpenAIResponse{}, fmt.Errorf("unknown client: %s", clientName)
 	}
 }
 
 func getCurrentGameStateMessage(game *Game) GameMessage {
-	content := game.BuildGameStatePromptDetails()
+	gameState := game.BuildGameStatePromptDetails()
 
-	return openai.Message{
+	formattedState := fmt.Sprint(`
+	[GAME STATE]
+	Current Location: `, gameState.CurrentLocation, `
+	Adjacent Locations: `, gameState.AdjacentLocationNames, `
+	Inventory: `, gameState.Inventory, `
+	Enemies in Location: `, gameState.EnemiesInLocation, `
+	Interactive Items: `, gameState.InteractiveItems, `
+	Removable Items: `, gameState.RemovableItems, `
+	Central Plot: `, gameState.CentralPlot, `
+	Story Threads: `, gameState.StoryThreads, `
+	`)
+
+	log.Printf("CURRENT GAME STATE: %s", formattedState)
+
+	return aiapi.OpenAiMessage{
 		Role:    "system",
-		Content: content.GetJsonOrEmptyString(),
+		Content: formattedState,
 	}
 }
