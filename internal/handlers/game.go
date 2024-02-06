@@ -214,8 +214,8 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
+
 		w.Write(newGameJson)
-		return
 	}
 }
 
@@ -238,6 +238,5 @@ func HandleWorldTreeVisualization(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte("Location Tree Visualization\n"))
 		w.Write([]byte(g.World.VisualizeLocationTree()))
-		return
 	}
 }

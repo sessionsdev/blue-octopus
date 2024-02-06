@@ -12,18 +12,13 @@ import (
 
 var Client *OpenAIClient
 
-func init() {
-	Client = New(
-		"gpt-4-0125-preview",
-		0.7,
-		ResponseFormat{Type: "json_object"},
-	)
-
+var ModelMap = map[string]string{
+	"gpt3": "gpt-3.5-turbo-0125",
+	"gpt4": "gpt-4-0125-preview",
 }
 
-var models = []string{
-	"gpt-3.5-turbo-0125",
-	"gpt-4-0125-preview",
+func init() {
+	Client = New(ModelMap["gpt3"], 0.7, ResponseFormat{Type: "json_object"})
 }
 
 func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClient {
@@ -106,6 +101,10 @@ type OpenAIClient struct {
 	Model          string
 	Temperature    float64
 	ResponseFormat ResponseFormat
+}
+
+func (c *OpenAIClient) GetClientName() string {
+	return c.ClientName
 }
 
 func (c *OpenAIClient) CallOpenAIChat(userMessages []OpenAiMessage) (OpenAIResponse, error) {

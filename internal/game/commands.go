@@ -9,6 +9,7 @@ import (
 )
 
 func (g *Game) ProcessGameCommand(command string) (GameUpdate, error) {
+
 	userMessage := aiapi.OpenAiMessage{Role: "user", Content: command}
 
 	messages := g.BuildCurrentContext(

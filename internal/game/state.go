@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/gob"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
-	"unicode"
 
 	"github.com/sessionsdev/blue-octopus/internal/aiapi"
 	"github.com/sessionsdev/blue-octopus/internal/redis"
@@ -18,8 +16,31 @@ func init() {
 	gob.Register(aiapi.OpenAiMessage{})
 }
 
-func (g *Game) AppendToMessageHistory(message GameMessage) {
-	g.GameMessageHistory = append(g.GameMessageHistory, message)
+type GameUpdate struct {
+	Response             string                   `json:"response"`
+	ProposedStateChanges GameStateResponseDetails `json:"proposed_state_changes"`
+}
+
+type GameStateResponseDetails struct {
+	NewCurrentLocation                  string   `json:"new_current_location"`
+	NewAdjacentLocations                []string `json:"new_adjacent_locations"`
+	UpdatedEnemiesInLocation            []string `json:"updated_enemies_in_location"`
+	UpdatedInteractiveObjectsInLocation []string `json:"updated_interactive_objects_in_location"`
+	UpdatedRemovableItemsInLocation     []string `json:"updated_removable_items_in_location"`
+	UpdatedPlayerInventory              []string `json:"updated_player_inventory"`
+	NewStoryThreads                     []string `json:"new_story_threads"`
+}
+
+func GetFieldDescriptionsForResponseDetails() string {
+	return `{
+		"new_current_location": "The name of the new current location.",
+		"new_adjacent_locations": ["A list of the names of the new adjacent locations."],
+		"updated_enemies_in_location": ["A list of the updated enemies in the current location."],
+		"updated_interactive_objects_in_location": ["A list of the updated interactive objects in the current location."],
+		"updated_removable_items_in_location": ["A list of the updated removable items in the current location."],
+		"updated_player_inventory": ["A list of the updated items in the player's inventory."],
+		"new_story_threads": ["A list of the new story threads."]
+	}`
 }
 
 func (g *Game) UpdateGameState(userMessage GameMessage, stateUpdate GameUpdate, tokensUsed int, assistantMessage GameMessage) {
@@ -105,18 +126,6 @@ func (g *Game) handleLocationUpdate(stateUpdate GameUpdate) {
 	}
 
 	g.World.UpdateCurrentLocation(locationToUpdate)
-	jsonOutput, err := json.MarshalIndent(g.World.CurrentLocation, "", "  ")
-	if err != nil {
-		log.Printf("JSON marshalling failed: %s", err)
-	} else {
-		log.Printf("NEW CURRENT LOCATION: %s", jsonOutput)
-	}
-
-}
-
-type Player struct {
-	Name      string   `json:"name"`
-	Inventory []string `json:"inventory"`
 }
 
 func contains(arr []string, str string) bool {
@@ -220,80 +229,6 @@ func randomId() (s string, err error) {
 
 	s = fmt.Sprintf("%x", b)
 	return
-}
-
-type GameUpdate struct {
-	Response             string                   `json:"response"`
-	ProposedStateChanges GameStateResponseDetails `json:"proposed_state_changes"`
-}
-
-type GameStatePromptDetails struct {
-	CurrentLocation       string   `json:"current_location"`
-	AdjacentLocationNames []string `json:"adjacent_locations"`
-	Inventory             []string `json:"player_inventory"`
-	EnemiesInLocation     []string `json:"enemies_in_location"`
-	InteractiveItems      []string `json:"interactive_objects_in_location"`
-	RemovableItems        []string `json:"removable_items_in_location"`
-	CentralPlot           string   `json:"central_plot"`
-	StoryThreads          []string `json:"story_threads"`
-}
-
-func (g *Game) BuildGameStatePromptDetails() GameStatePromptDetails {
-	currentLocation := g.World.CurrentLocation
-	player := g.Player
-
-	if currentLocation == nil {
-		currentLocation = &Location{}
-	}
-
-	if player == nil {
-		player = &Player{}
-	}
-
-	adjacentLocationNames := make([]string, len(currentLocation.AdjacentLocations))
-	for i, location := range currentLocation.AdjacentLocations {
-		adjacentLocationNames[i] = location
-	}
-
-	return GameStatePromptDetails{
-		CurrentLocation:       currentLocation.LocationName,
-		AdjacentLocationNames: adjacentLocationNames,
-		Inventory:             g.Player.Inventory,
-		EnemiesInLocation:     currentLocation.EnemiesInLocation,
-		InteractiveItems:      currentLocation.InteractiveItems,
-		RemovableItems:        currentLocation.RemovableItems,
-		CentralPlot:           g.CentralPlot,
-		StoryThreads:          g.StoryThreads,
-	}
-}
-
-func makeCamelCase(str string) string {
-	lower := strings.ToLower(str)
-	words := strings.Fields(lower)
-	for i, word := range words {
-		words[i] = string(unicode.ToUpper(rune(word[0]))) + word[1:]
-	}
-
-	return strings.Join(words, "")
-}
-
-func (gs *GameStatePromptDetails) GetJsonOrEmptyString() string {
-	jsonString, err := json.Marshal(gs)
-	if err != nil {
-		return ""
-	}
-
-	return string(jsonString)
-}
-
-type GameStateResponseDetails struct {
-	NewCurrentLocation                  string   `json:"new_current_location"`
-	NewAdjacentLocations                []string `json:"new_adjacent_locations"`
-	UpdatedEnemiesInLocation            []string `json:"updated_enemies_in_location"`
-	UpdatedInteractiveObjectsInLocation []string `json:"updated_interactive_objects_in_location"`
-	UpdatedRemovableItemsInLocation     []string `json:"updated_removable_items_in_location"`
-	UpdatedPlayerInventory              []string `json:"updated_player_inventory"`
-	NewStoryThreads                     []string `json:"new_story_threads"`
 }
 
 func (g *Game) encodeGame() []byte {

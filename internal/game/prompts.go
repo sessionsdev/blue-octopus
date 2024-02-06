@@ -1,5 +1,7 @@
 package game
 
+import "encoding/json"
+
 var SETUP_PROMPT = `
 **Game Master Role in Text-Based Adventure:**
 
@@ -67,3 +69,65 @@ Ensure each response and state update reflects the evolving game world, offering
 
 **Initial Prompt for Players:** "You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here."
 `
+
+type GameStatePromptDetails struct {
+	CurrentLocation       string   `json:"current_location"`
+	AdjacentLocationNames []string `json:"adjacent_locations"`
+	Inventory             []string `json:"player_inventory"`
+	EnemiesInLocation     []string `json:"enemies_in_location"`
+	InteractiveItems      []string `json:"interactive_objects_in_location"`
+	RemovableItems        []string `json:"removable_items_in_location"`
+	CentralPlot           string   `json:"central_plot"`
+	StoryThreads          []string `json:"story_threads"`
+}
+
+func GetJsonFieldDescriptionsForPromptDetails() string {
+	return `{
+		"current_location": "The name of the current location.",
+		"adjacent_locations": ["A list of the names of the adjacent locations."],
+		"player_inventory": ["A list of the items in the player's inventory."],
+		"enemies_in_location": ["A list of the enemies in the current location."],
+		"interactive_objects_in_location": ["A list of the interactive objects in the current location.",
+		"removable_items_in_location": ["A list of the removable items in the current location."],
+		"central_plot": "The central plot of the game.",
+		"story_threads": ["A list of the story threads."]
+	}`
+}
+
+func (g *Game) BuildGameStatePromptDetails() GameStatePromptDetails {
+	currentLocation := g.World.CurrentLocation
+	player := g.Player
+
+	if currentLocation == nil {
+		currentLocation = &Location{}
+	}
+
+	if player == nil {
+		player = &Player{}
+	}
+
+	adjacentLocationNames := make([]string, len(currentLocation.AdjacentLocations))
+	for i, location := range currentLocation.AdjacentLocations {
+		adjacentLocationNames[i] = location
+	}
+
+	return GameStatePromptDetails{
+		CurrentLocation:       currentLocation.LocationName,
+		AdjacentLocationNames: adjacentLocationNames,
+		Inventory:             g.Player.Inventory,
+		EnemiesInLocation:     currentLocation.EnemiesInLocation,
+		InteractiveItems:      currentLocation.InteractiveItems,
+		RemovableItems:        currentLocation.RemovableItems,
+		CentralPlot:           g.CentralPlot,
+		StoryThreads:          g.StoryThreads,
+	}
+}
+
+func (gs *GameStatePromptDetails) GetJsonOrEmptyString() string {
+	jsonString, err := json.Marshal(gs)
+	if err != nil {
+		return ""
+	}
+
+	return string(jsonString)
+}
