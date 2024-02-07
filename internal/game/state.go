@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -16,55 +17,73 @@ func init() {
 	gob.Register(aiapi.OpenAiMessage{})
 }
 
-type GameUpdate struct {
-	Response             string                   `json:"response"`
-	ProposedStateChanges GameStateResponseDetails `json:"proposed_state_changes"`
+type GameStateDetails struct {
+	CurrentLocation       string   `json:"current_location"`
+	AdjacentLocationNames []string `json:"adjacent_locations"`
+	Inventory             []string `json:"player_inventory"`
+	InteractiveItems      []string `json:"interactive_objects_in_location"`
+	Obstacles             []string `json:"obstacles_in_location"`
+	StoryThreads          []string `json:"story_threads"`
 }
 
-type GameStateResponseDetails struct {
-	NewCurrentLocation                  string   `json:"new_current_location"`
-	NewAdjacentLocations                []string `json:"new_adjacent_locations"`
-	UpdatedEnemiesInLocation            []string `json:"updated_enemies_in_location"`
-	UpdatedInteractiveObjectsInLocation []string `json:"updated_interactive_objects_in_location"`
-	UpdatedRemovableItemsInLocation     []string `json:"updated_removable_items_in_location"`
-	UpdatedPlayerInventory              []string `json:"updated_player_inventory"`
-	NewStoryThreads                     []string `json:"new_story_threads"`
-}
+func (g *Game) BuildGameStateDetails() GameStateDetails {
+	currentLocation := g.World.CurrentLocation
+	player := g.Player
 
-func GetFieldDescriptionsForResponseDetails() string {
-	return `{
-		"new_current_location": "The name of the new current location.",
-		"new_adjacent_locations": ["A list of the names of the new adjacent locations."],
-		"updated_enemies_in_location": ["A list of the updated enemies in the current location."],
-		"updated_interactive_objects_in_location": ["A list of the updated interactive objects in the current location."],
-		"updated_removable_items_in_location": ["A list of the updated removable items in the current location."],
-		"updated_player_inventory": ["A list of the updated items in the player's inventory."],
-		"new_story_threads": ["A list of the new story threads."]
-	}`
-}
-
-func (g *Game) UpdateGameState(userMessage GameMessage, stateUpdate GameUpdate, tokensUsed int, assistantMessage GameMessage) {
-	g.handleLocationUpdate(stateUpdate)
-
-	if stateUpdate.ProposedStateChanges.UpdatedPlayerInventory != nil {
-		g.Player.Inventory = stateUpdate.ProposedStateChanges.UpdatedPlayerInventory
-		log.Println("Updated Inventory: ", g.Player.Inventory)
+	if currentLocation == nil {
+		currentLocation = &Location{}
 	}
 
-	if stateUpdate.ProposedStateChanges.NewStoryThreads != nil && len(stateUpdate.ProposedStateChanges.NewStoryThreads) > 0 {
-		g.StoryThreads = append(g.StoryThreads, stateUpdate.ProposedStateChanges.NewStoryThreads...)
-		log.Println("Updated Story Threads: ", g.StoryThreads)
+	if player == nil {
+		player = &Player{}
 	}
 
-	g.TotalTokensUsed += tokensUsed
-	log.Println("Total tokens used: ", g.TotalTokensUsed)
+	adjacentLocationNames := make([]string, len(currentLocation.AdjacentLocations))
+	for i, location := range currentLocation.AdjacentLocations {
+		adjacentLocationNames[i] = location
+	}
 
+	return GameStateDetails{
+		CurrentLocation:       currentLocation.LocationName,
+		AdjacentLocationNames: adjacentLocationNames,
+		Inventory:             g.Player.Inventory,
+		InteractiveItems:      currentLocation.InteractiveItems,
+		StoryThreads:          g.StoryThreads,
+		Obstacles:             currentLocation.Obstacles,
+	}
+}
+
+func (gs *GameStateDetails) GetJsonOrEmptyString() string {
+	jsonString, err := json.Marshal(gs)
+	if err != nil {
+		return ""
+	}
+
+	return string(jsonString)
+}
+
+func (g *Game) UpdateGameHistory(userMessage GameMessage, assistantMessage GameMessage) {
 	g.GameMessageHistory = append(g.GameMessageHistory, userMessage)
 	g.GameMessageHistory = append(g.GameMessageHistory, assistantMessage)
 }
 
-func (g *Game) handleLocationUpdate(stateUpdate GameUpdate) {
-	proposedLocationName := stateUpdate.ProposedStateChanges.NewCurrentLocation
+func (g *Game) UpdateGameState(stateUpdate GameStateDetails) {
+	g.handleLocationUpdate(stateUpdate)
+
+	if stateUpdate.Inventory != nil {
+		g.Player.Inventory = stateUpdate.Inventory
+		log.Println("Updated Inventory: ", g.Player.Inventory)
+	}
+
+	if stateUpdate.StoryThreads != nil {
+		g.StoryThreads = stateUpdate.StoryThreads
+	}
+
+	g.SaveGameToRedis()
+}
+
+func (g *Game) handleLocationUpdate(stateUpdate GameStateDetails) {
+	proposedLocationName := stateUpdate.CurrentLocation
 	normalized := strings.ReplaceAll(strings.ToLower(proposedLocationName), " ", "_")
 
 	var locationToUpdate *Location
@@ -75,8 +94,7 @@ func (g *Game) handleLocationUpdate(stateUpdate GameUpdate) {
 		if locationToUpdate == nil {
 			locationToUpdate = &Location{
 				LocationName:      proposedLocationName,
-				EnemiesInLocation: []string{},
-				RemovableItems:    []string{},
+				Obstacles:         []string{},
 				InteractiveItems:  []string{},
 				AdjacentLocations: []string{g.World.CurrentLocation.LocationName},
 			}
@@ -89,22 +107,18 @@ func (g *Game) handleLocationUpdate(stateUpdate GameUpdate) {
 	}
 
 	// update the location with the new state
-	if stateUpdate.ProposedStateChanges.UpdatedEnemiesInLocation != nil {
-		locationToUpdate.EnemiesInLocation = stateUpdate.ProposedStateChanges.UpdatedEnemiesInLocation
+	if stateUpdate.Obstacles != nil {
+		locationToUpdate.Obstacles = stateUpdate.Obstacles
 	}
 
-	if stateUpdate.ProposedStateChanges.UpdatedInteractiveObjectsInLocation != nil {
-		locationToUpdate.InteractiveItems = stateUpdate.ProposedStateChanges.UpdatedInteractiveObjectsInLocation
+	if stateUpdate.InteractiveItems != nil {
+		locationToUpdate.InteractiveItems = stateUpdate.InteractiveItems
 	}
 
-	if stateUpdate.ProposedStateChanges.UpdatedRemovableItemsInLocation != nil {
-		locationToUpdate.RemovableItems = stateUpdate.ProposedStateChanges.UpdatedRemovableItemsInLocation
-	}
-
-	if stateUpdate.ProposedStateChanges.NewAdjacentLocations != nil {
+	if stateUpdate.AdjacentLocationNames != nil {
 
 		// for each new adjacent location, add the current location to the adjacent locations
-		for _, potientialAdjacentLocation := range stateUpdate.ProposedStateChanges.NewAdjacentLocations {
+		for _, potientialAdjacentLocation := range stateUpdate.AdjacentLocationNames {
 			// normalize the location names
 			normalized := strings.ReplaceAll(strings.ToLower(potientialAdjacentLocation), " ", "_")
 			adjacentLocation := g.World.Locations[normalized]
@@ -113,8 +127,7 @@ func (g *Game) handleLocationUpdate(stateUpdate GameUpdate) {
 			if adjacentLocation == nil {
 				adjacentLocation = &Location{
 					LocationName:      potientialAdjacentLocation,
-					EnemiesInLocation: []string{},
-					RemovableItems:    []string{},
+					Obstacles:         []string{},
 					InteractiveItems:  []string{},
 					AdjacentLocations: []string{locationToUpdate.LocationName},
 				}
@@ -137,7 +150,7 @@ func contains(arr []string, str string) bool {
 	return false
 }
 
-func InitializeNewGame(setupMessage GameMessage) *Game {
+func InitializeNewGame() *Game {
 	// generate a unique UUID for the game
 	id, err := randomId()
 	if err != nil {
@@ -160,13 +173,10 @@ func InitializeNewGame(setupMessage GameMessage) *Game {
 
 	newGame.Player = &player
 	newGame.World = &world
-	newGame.SetupMessage = setupMessage
-	newGame.CentralPlot = "The player starts outside a blue house in a forested area, with no specific instructions, but soon discovers that the main goal is to collect treasures and bring them back to the house. As the game progresses, the player navigates through a series of complex underground passages filled with puzzles, traps, and creatures such as grues (dangerous beings that inhabit dark places), all while gathering valuable items. The ultimate objective is to find all the treasures and secure them in the trophy case at the white house, achieving the rank of Master Adventurer. "
 	newGame.StoryThreads = []string{
-		"The player starts outside a blue house in a forested area with no memory",
-		"There is a leaflet hidden in the mailbox explaining the general objective of the game.",
-		"A crowbar is required to open the boarded door.  It is not in this location.",
-		"There is a hidden and locked celler door in the back of the house.  It requires a key to open.",
+		"The player awoke at the blue house with no memory.",
+		"The player must find a way to enter the blue house.",
+		"The blue house contains a trophy case that must be filled with various treasures to complete the game.",
 	}
 
 	return newGame
@@ -174,9 +184,8 @@ func InitializeNewGame(setupMessage GameMessage) *Game {
 
 func buildInitialWorldLocations() map[string]*Location {
 	blueHouse := &Location{
-		LocationName:      "Blue House",
-		EnemiesInLocation: []string{},
-		RemovableItems:    []string{"leaflet"},
+		LocationName: "Blue House",
+		Obstacles:    []string{"Borded Door", "Locked Cellar Door"},
 		InteractiveItems: []string{
 			"Mailbox",
 			"Borded Door",
@@ -185,11 +194,10 @@ func buildInitialWorldLocations() map[string]*Location {
 	}
 
 	riverLocation := &Location{
-		LocationName:      "River",
-		EnemiesInLocation: []string{"Mud Man"},
-		RemovableItems:    []string{"leaf"},
+		LocationName: "River",
+		Obstacles:    []string{"Cross the river"},
 		InteractiveItems: []string{
-			"Boat",
+			"Hidden Boat",
 			"Fish",
 		},
 		AdjacentLocations: []string{
@@ -198,9 +206,8 @@ func buildInitialWorldLocations() map[string]*Location {
 	}
 
 	theRoadLocation := &Location{
-		LocationName:      "The Road",
-		EnemiesInLocation: []string{"Bandit"},
-		RemovableItems:    []string{"rock"},
+		LocationName: "The Road",
+		Obstacles:    []string{"Bandin on the road"},
 		InteractiveItems: []string{
 			"Sign",
 			"Tree",

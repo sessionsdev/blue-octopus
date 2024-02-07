@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"time"
 
-	"github.com/sessionsdev/blue-octopus/internal/aiapi"
 	"github.com/sessionsdev/blue-octopus/internal/game"
 )
 
@@ -24,7 +22,6 @@ type UserPromptWithState struct {
 type PreparedStats struct {
 	Location  string
 	Inventory []string
-	Enemies   []string
 }
 
 var PreparedStatsCache *PreparedStats = &PreparedStats{}
@@ -32,14 +29,9 @@ var PreparedStatsCache *PreparedStats = &PreparedStats{}
 func populatePreparedStatsCache(g *game.Game) {
 	PreparedStatsCache.Location = g.World.CurrentLocation.LocationName
 	PreparedStatsCache.Inventory = g.Player.Inventory
-	PreparedStatsCache.Enemies = g.World.CurrentLocation.EnemiesInLocation
 
 	if len(PreparedStatsCache.Inventory) == 0 {
 		PreparedStatsCache.Inventory = []string{"You're not carrying anything."}
-	}
-
-	if len(PreparedStatsCache.Enemies) == 0 {
-		PreparedStatsCache.Enemies = []string{"You are safe."}
 	}
 }
 
@@ -85,16 +77,12 @@ func ServeGamePage(w http.ResponseWriter, r *http.Request) {
 	gameIdFromCookie := getGameIdCookieValue(r)
 	if gameIdFromCookie == "" {
 		// If no game id cookie exists, create a new game
-		log.Println("No game id cookie found, creating a new game")
-
-		g = game.InitializeNewGame(aiapi.OpenAiMessage{Role: "system", Content: game.SETUP_PROMPT})
+		g = game.InitializeNewGame()
 		g.SaveGameToRedis()
-		log.Printf("New game created with id: %s", g.GameId)
 	} else {
 		loadedGame, err := game.LoadGameFromRedis(gameIdFromCookie)
 		if err != nil {
-			log.Println("Error loading game from redis: ", err)
-			g = game.InitializeNewGame(aiapi.OpenAiMessage{Role: "system", Content: game.SETUP_PROMPT})
+			g = game.InitializeNewGame()
 			g.SaveGameToRedis()
 		}
 		g = loadedGame
@@ -151,17 +139,17 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 
 	switch command {
 	case "RESET GAME":
-		g = game.InitializeNewGame(aiapi.OpenAiMessage{Role: "system", Content: game.SETUP_PROMPT})
+		g = game.InitializeNewGame()
 		setGameIdCookie(w, g.GameId)
 		html = fmt.Sprintf("RESET GAME: New game created with id: %s", g.GameId)
 	default:
-		gameUpdate, err := g.ProcessGameCommand(command)
+		narrativeResponse, err := g.ProcessGameCommand(command)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		html = fmt.Sprintf("<p>PLAYER: %s\n<p>GAME MASTER: %s</p>", command, gameUpdate.Response)
+		html = fmt.Sprintf("<p>PLAYER: %s\n<p>GAME MASTER: %s</p>", command, narrativeResponse)
 	}
 
 	populatePreparedStatsCache(g)
@@ -216,27 +204,5 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Write(newGameJson)
-	}
-}
-
-func HandleWorldTreeVisualization(w http.ResponseWriter, r *http.Request) {
-	// For GET requests, return the current full game state
-	if r.Method == http.MethodGet {
-		// get game id cookie
-		cookie, err := r.Cookie("GameId")
-		if err != nil {
-			http.Error(w, "No game id cookie found", http.StatusBadRequest)
-			return
-		}
-
-		g, err := game.LoadGameFromRedis(cookie.Value)
-		if err != nil {
-			w.Write([]byte("No game found for id: " + cookie.Value))
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte("Location Tree Visualization\n"))
-		w.Write([]byte(g.World.VisualizeLocationTree()))
 	}
 }

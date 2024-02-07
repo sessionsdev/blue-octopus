@@ -15,7 +15,6 @@ func initializeApiRoutes() {
 	http.HandleFunc("/api/hello-world", ServeHelloWorldAPI)
 	http.HandleFunc("/api/process-command", HandleGameCommand)
 	http.HandleFunc("/api/game-state", HandleGameState)
-	http.HandleFunc("/api/location-tree", HandleWorldTreeVisualization)
 	http.HandleFunc("/api/stats-display", ServeGameStats)
 }
 

@@ -18,7 +18,7 @@ var ModelMap = map[string]string{
 }
 
 func init() {
-	Client = New(ModelMap["gpt3"], 0.7, ResponseFormat{Type: "json_object"})
+	Client = New(ModelMap["gpt3"], 0.7, ResponseFormat{Type: "text"})
 }
 
 func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClient {
@@ -129,6 +129,8 @@ func (c *OpenAIClient) CallOpenAIChat(userMessages []OpenAiMessage) (OpenAIRespo
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
+	// Log request attempt
+	log.Print("REQUEST: CHAT COMPLETION API")
 	resp, err := c.Client.Do(req)
 	if err != nil {
 		return OpenAIResponse{}, fmt.Errorf("error making request: %w", err)
@@ -142,6 +144,9 @@ func (c *OpenAIClient) CallOpenAIChat(userMessages []OpenAiMessage) (OpenAIRespo
 		log.Printf("response body: %s", buf.String())
 		return OpenAIResponse{}, fmt.Errorf("received non-OK response status: %s", resp.Status)
 	}
+
+	// log successful response code
+	log.Printf("OPEN AI REPONSE STATUS: %s", resp.Status)
 
 	var openAiResponse OpenAIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&openAiResponse); err != nil {

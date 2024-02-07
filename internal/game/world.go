@@ -6,10 +6,9 @@ import (
 
 type Location struct {
 	LocationName      string   `json:"location_name"`
-	EnemiesInLocation []string `json:"enemies_in_location"`
-	RemovableItems    []string `json:"removable_items"`
 	InteractiveItems  []string `json:"interactive_items"`
 	AdjacentLocations []string `json:"adjacent_locations"`
+	Obstacles         []string `json:"obstacles"`
 }
 
 func (l *Location) getNormalizedName() string {
