@@ -11,6 +11,7 @@ import (
 )
 
 var OpenAiClient *OpenAIClient
+var OpenAiJsonClient *OpenAIClient
 
 var ModelMap = map[string]string{
 	"gpt3": "gpt-3.5-turbo-0125",
@@ -19,6 +20,7 @@ var ModelMap = map[string]string{
 
 func init() {
 	OpenAiClient = New(ModelMap["gpt3"], 0.7, ResponseFormat{Type: "text"})
+	OpenAiJsonClient = New(ModelMap["gpt3"], 0.7, ResponseFormat{Type: "json_object"})
 }
 
 func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClient {
@@ -166,7 +168,6 @@ func (c *OpenAIClient) DoRequest(userMessages []AiMessage) (*OpenAiChatResponse,
 func convertMessageType(messages []AiMessage) []OpenAiMessage {
 	var openAiMessages []OpenAiMessage
 	for _, m := range messages {
-		log.Printf("Message Pre Conversion: %s", m.Message)
 		openAiMessages = append(openAiMessages, OpenAiMessage{Role: m.Provider, Content: m.Message})
 	}
 	return openAiMessages

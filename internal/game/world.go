@@ -7,10 +7,9 @@ import (
 type Location struct {
 	LocationName       string
 	PreviousLocation   string
-	InteractiveItems   []string
-	potentialLocations []string
-	Obstacles          []string
-	Enemies            []string
+	InteractiveItems   map[string]struct{}
+	PotentialLocations map[string]struct{}
+	Enemies            map[string]struct{}
 }
 
 func (l *Location) getNormalizedName() string {
@@ -23,11 +22,13 @@ type World struct {
 	CurrentLocation *Location
 }
 
-func (w *World) NextLocation(newLocation *Location) {
+func (w *World) NextLocation(newLocation string) *Location {
 	// new location doesn't exist in the world, add it
-	w.SafeAddLocation(newLocation)
-	newLocation.PreviousLocation = w.CurrentLocation.LocationName
-	w.CurrentLocation = newLocation
+	location := w.SafeAddLocation(newLocation)
+	location.PreviousLocation = w.CurrentLocation.LocationName
+	w.CurrentLocation = location
+
+	return w.CurrentLocation
 }
 
 func (w *World) GetLocationByName(locationName string) (*Location, bool) {
@@ -36,11 +37,19 @@ func (w *World) GetLocationByName(locationName string) (*Location, bool) {
 	return location, ok
 }
 
-func (w *World) SafeAddLocation(location *Location) {
-	normalized := location.getNormalizedName()
-	_, ok := w.Locations[normalized]
-	if !ok {
-		w.Locations[normalized] = location
-		return
+func (w *World) SafeAddLocation(locationName string) *Location {
+	location := &Location{
+		LocationName:       locationName,
+		InteractiveItems:   make(map[string]struct{}),
+		PotentialLocations: make(map[string]struct{}),
+		Enemies:            make(map[string]struct{}),
 	}
+
+	normalizedName := location.getNormalizedName()
+	location, ok := w.Locations[normalizedName]
+	if !ok {
+		w.Locations[normalizedName] = location
+		return location
+	}
+	return location
 }

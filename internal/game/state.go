@@ -6,35 +6,51 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
-	"strings"
 
+	utils "github.com/sessionsdev/blue-octopus/internal"
 	"github.com/sessionsdev/blue-octopus/internal/redis"
 )
 
 func init() {
 	gob.Register(GameMessage{})
+	gob.Register(map[string]struct{}{})
 }
 
 type GameStateDetails struct {
 	CurrentLocation       string   `json:"current_location"`
-	PreviousLocation      string   `json:"previous_location"`
 	AdjacentLocationNames []string `json:"adjacent_locations"`
 	Inventory             []string `json:"player_inventory"`
 	InteractiveItems      []string `json:"interactive_objects"`
-	Obstacles             []string `json:"obstacles"`
 	Enemies               []string `json:"enemies"`
 	StoryThreads          []string `json:"story_threads"`
 }
 
+type GameStateUpdateResponse struct {
+	CurrentLocation    string   `json:"current_location"`
+	PotentialLocations []string `json:"potential_locations"`
+	InventoryUpdates   struct {
+		Added   []string `json:"added"`
+		Removed []string `json:"removed"`
+	} `json:"inventory_updates"`
+	InteractiveObjectsUpdates struct {
+		Added   []string `json:"added"`
+		Removed []string `json:"removed"`
+	} `json:"interactive_objects_updates"`
+	EnemiesUpdates struct {
+		Added    []string `json:"added"`
+		Defeated []string `json:"defeated"`
+	} `json:"enemies_updates"`
+	StoryThreads []string `json:"story_threads"`
+}
+
 func (g *Game) BuildGameStateDetails() GameStateDetails {
+	utils.GetStringsFromMap(g.World.CurrentLocation.PotentialLocations)
 	return GameStateDetails{
 		CurrentLocation:       g.World.CurrentLocation.LocationName,
-		PreviousLocation:      g.World.CurrentLocation.PreviousLocation,
-		AdjacentLocationNames: g.World.CurrentLocation.potentialLocations,
-		Inventory:             g.Player.Inventory,
-		InteractiveItems:      g.World.CurrentLocation.InteractiveItems,
-		Obstacles:             g.World.CurrentLocation.Obstacles,
-		Enemies:               g.World.CurrentLocation.Enemies,
+		AdjacentLocationNames: utils.GetStringsFromMap(g.World.CurrentLocation.PotentialLocations),
+		Inventory:             utils.GetStringsFromMap(g.Player.Inventory),
+		InteractiveItems:      utils.GetStringsFromMap(g.World.CurrentLocation.InteractiveItems),
+		Enemies:               utils.GetStringsFromMap(g.World.CurrentLocation.Enemies),
 		StoryThreads:          g.StoryThreads,
 	}
 }
@@ -44,12 +60,21 @@ func (g *Game) UpdateGameHistory(userMessage GameMessage, assistantMessage GameM
 	g.GameMessageHistory = append(g.GameMessageHistory, assistantMessage)
 }
 
-func (g *Game) UpdateGameState(stateUpdate GameStateDetails) {
+func (g *Game) UpdateGameState(stateUpdate GameStateUpdateResponse) {
 	g.handleLocationUpdate(stateUpdate)
 
-	if stateUpdate.Inventory != nil {
-		g.Player.Inventory = stateUpdate.Inventory
-		log.Println("Updated Inventory: ", g.Player.Inventory)
+	if stateUpdate.InventoryUpdates.Added != nil {
+		log.Printf("Adding items to inventory: %v", stateUpdate.InventoryUpdates.Added)
+		for _, item := range stateUpdate.InventoryUpdates.Added {
+			g.Player.Inventory[item] = struct{}{}
+		}
+	}
+
+	if stateUpdate.InventoryUpdates.Removed != nil {
+		log.Printf("Removing items from inventory: %v", stateUpdate.InventoryUpdates.Removed)
+		for _, item := range stateUpdate.InventoryUpdates.Removed {
+			delete(g.Player.Inventory, item)
+		}
 	}
 
 	if stateUpdate.StoryThreads != nil {
@@ -59,63 +84,48 @@ func (g *Game) UpdateGameState(stateUpdate GameStateDetails) {
 	g.SaveGameToRedis()
 }
 
-func (g *Game) handleLocationUpdate(stateUpdate GameStateDetails) {
-	proposedLocationName := stateUpdate.CurrentLocation
-	normalized := strings.ReplaceAll(strings.ToLower(proposedLocationName), " ", "_")
-
-	var locationToUpdate *Location
-
-	if proposedLocationName != "" {
-		locationToUpdate = g.World.Locations[normalized]
-
-		if locationToUpdate == nil {
-			locationToUpdate = &Location{
-				LocationName:       proposedLocationName,
-				Obstacles:          []string{},
-				InteractiveItems:   []string{},
-				potentialLocations: []string{g.World.CurrentLocation.LocationName},
-			}
-
-			g.World.Locations[normalized] = locationToUpdate
-		}
-	} else {
-		// if the location is not provided, no update is needed
-		return
+func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
+	proposedLocation := stateUpdate.CurrentLocation
+	if proposedLocation != "" {
+		location := g.World.NextLocation(proposedLocation)
+		log.Println("Moving to new location: ", location.LocationName)
 	}
 
-	// update the location with the new state
-	if stateUpdate.Obstacles != nil {
-		locationToUpdate.Obstacles = stateUpdate.Obstacles
-	}
-
-	if stateUpdate.InteractiveItems != nil {
-		locationToUpdate.InteractiveItems = stateUpdate.InteractiveItems
-	}
-
-	if stateUpdate.AdjacentLocationNames != nil {
-
-		// for each new adjacent location, add the current location to the adjacent locations
-		for _, potientialAdjacentLocation := range stateUpdate.AdjacentLocationNames {
-			// normalize the location names
-			normalized := strings.ReplaceAll(strings.ToLower(potientialAdjacentLocation), " ", "_")
-			adjacentLocation := g.World.Locations[normalized]
-
-			// if adjacent location does not exist, create it
-			if adjacentLocation == nil {
-				adjacentLocation = &Location{
-					LocationName:       potientialAdjacentLocation,
-					Obstacles:          []string{},
-					InteractiveItems:   []string{},
-					potentialLocations: []string{locationToUpdate.LocationName},
-				}
-
-				// add the new location to the world
-				g.World.Locations[normalized] = adjacentLocation
-			}
+	if stateUpdate.PotentialLocations != nil {
+		log.Println("Updating potential locations: ", stateUpdate.PotentialLocations)
+		for _, locationName := range stateUpdate.PotentialLocations {
+			g.World.CurrentLocation.PotentialLocations[locationName] = struct{}{}
 		}
 	}
 
-	g.World.NextLocation(locationToUpdate)
+	if stateUpdate.InteractiveObjectsUpdates.Added != nil {
+		log.Printf("Adding interactive objects: %v", stateUpdate.InteractiveObjectsUpdates.Added)
+		for _, obj := range stateUpdate.InteractiveObjectsUpdates.Added {
+			g.World.CurrentLocation.InteractiveItems[obj] = struct{}{}
+		}
+	}
+
+	if stateUpdate.InteractiveObjectsUpdates.Removed != nil {
+		log.Printf("Removing interactive objects: %v", stateUpdate.InteractiveObjectsUpdates.Removed)
+		for _, obj := range stateUpdate.InteractiveObjectsUpdates.Removed {
+			delete(g.World.CurrentLocation.InteractiveItems, obj)
+		}
+	}
+
+	if stateUpdate.EnemiesUpdates.Added != nil {
+		log.Printf("Adding enemies: %v", stateUpdate.EnemiesUpdates.Added)
+		for _, enemy := range stateUpdate.EnemiesUpdates.Added {
+			g.World.CurrentLocation.Enemies[enemy] = struct{}{}
+		}
+	}
+
+	if stateUpdate.EnemiesUpdates.Defeated != nil {
+		log.Printf("Defeating enemies: %v", stateUpdate.EnemiesUpdates.Defeated)
+		for _, enemy := range stateUpdate.EnemiesUpdates.Defeated {
+			delete(g.World.CurrentLocation.Enemies, enemy)
+		}
+	}
+
 }
 
 func contains(arr []string, str string) bool {
@@ -145,7 +155,7 @@ func InitializeNewGame() *Game {
 
 	player := Player{
 		Name:      "Adventurer",
-		Inventory: []string{},
+		Inventory: map[string]struct{}{},
 	}
 
 	newGame.Player = &player
@@ -162,39 +172,38 @@ func InitializeNewGame() *Game {
 func buildInitialWorldLocations() map[string]*Location {
 	blueHouse := &Location{
 		LocationName: "Blue House",
-		Obstacles:    []string{"Borded Door", "Locked Cellar Door"},
-		InteractiveItems: []string{
-			"Mailbox",
-			"Borded Door",
+		InteractiveItems: map[string]struct{}{
+			"Borded Door": {},
 		},
-		potentialLocations: []string{},
+		PotentialLocations: map[string]struct{}{
+			"River":    {},
+			"The Road": {},
+		},
+		Enemies: map[string]struct{}{
+			"Guard Dog": {},
+		},
 	}
 
 	riverLocation := &Location{
 		LocationName: "River",
-		Obstacles:    []string{"Cross the river"},
-		InteractiveItems: []string{
-			"Hidden Boat",
-			"Fish",
+		InteractiveItems: map[string]struct{}{
+			"Boat": {},
 		},
-		potentialLocations: []string{
-			blueHouse.LocationName,
-		},
+		PreviousLocation:   "Blue House",
+		PotentialLocations: map[string]struct{}{},
 	}
 
 	theRoadLocation := &Location{
 		LocationName: "The Road",
-		Obstacles:    []string{"Bandin on the road"},
-		InteractiveItems: []string{
-			"Sign",
-			"Tree",
+		InteractiveItems: map[string]struct{}{
+			"Sign": {},
 		},
-		potentialLocations: []string{
-			blueHouse.LocationName,
+		PreviousLocation:   "Blue House",
+		PotentialLocations: map[string]struct{}{},
+		Enemies: map[string]struct{}{
+			"Bandit": {},
 		},
 	}
-
-	blueHouse.potentialLocations = append(blueHouse.potentialLocations, riverLocation.LocationName, theRoadLocation.LocationName)
 
 	locations := make(map[string]*Location)
 	locations[theRoadLocation.getNormalizedName()] = theRoadLocation
@@ -252,9 +261,26 @@ func LoadGameFromRedis(gameId string) (*Game, error) {
 
 	encodedGame, err := redis.GetGob(gameId)
 	if err != nil {
-		log.Printf("Error loading game from redis: %s", err)
-		return nil, err
+		log.Fatalf("Error loading game from redis: %s", gameId)
 	}
 
 	return decodeGame(encodedGame), nil
+}
+
+func safeRemoveString(slice []string, item string) []string {
+	for i, s := range slice {
+		if s == item {
+			return append(slice[:i], slice[i+1:]...)
+		}
+	}
+	return slice
+}
+
+func safeAddString(slice []string, item string) []string {
+	for _, s := range slice {
+		if s == item {
+			return slice
+		}
+	}
+	return append(slice, item)
 }

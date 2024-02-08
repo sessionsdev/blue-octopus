@@ -20,8 +20,6 @@ The enemies in the current location are: [%v]
 
 The interactive objects in the current location are: [%v]
 
-The obstacles in the current location are: [%v]
-
 The current story threads are:
 %v
 
@@ -41,7 +39,7 @@ func BuildGameMasterStatePrompt(g *Game, command string) string {
 		previousLocation = &Location{LocationName: "An Unknown Location"}
 	}
 	previousLocationName := previousLocation.LocationName
-	adjacentLocations := g.World.CurrentLocation.potentialLocations
+	adjacentLocations := g.World.CurrentLocation.PotentialLocations
 	// build a string and for each story thread, append it with a - and a new line
 	var storyThreads string
 	for _, thread := range g.StoryThreads {
@@ -56,69 +54,81 @@ func BuildGameMasterStatePrompt(g *Game, command string) string {
 		adjacentLocations,
 		currentLocation.Enemies,
 		currentLocation.InteractiveItems,
-		currentLocation.Obstacles,
 		storyThreads,
 		command)
 	return prompt
 }
 
 var STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT = `
-**Response Protocol:**
-You will be given the current game state and the most recent narrative context. Your role is to update the game state based on the player's actions and the game masters response.
+Your task is to update the game state based on a narrative context and current state of the game.
 
-The structure of the current state is as follows:
-{
-  "current_location": "The players  current location",
-  "player_inventory": ["Items in the players inventory"],
-  "interactive_objects": ["Interactive objects in the current location"],
-  "obstacles": ["Obstacles in the current location"],
-  "enemies": ["Enemies in the current location"],
-  "new_story_threads": ["A list of new story threads to be appended to the current story threads list"]
-  "inventory_items_added": ["Items Acquired By The Player"],
-  "inventory_items_removed": ["Items Removed From Players Inventory"],
-  "interactive_objects_added": ["New interactive objects for this location"],
-  "interactive_objects_removed": ["Any objects that are no longer interacted or needed"],
-  "obstacles_added": ["New obstacles for this location"],
-  "enemies_added": ["New enemies for this location"],
-  "enemies_defeated": ["Enemies that were defeated"],
-  "updated_story_threads": ["A list of updated story threads to be appended to the current story threads list"]
-}
+You will be provided the current state of the game in a json structure, and the most recent narrative context. Your role is to update the game state based on the player's actions and the game masters narrative response.
 
+**Responsibilities:**
 
-Return a structured JSON object that outlines the proposed changes to the game state. This should include the new current location, any new potential locations, inventory updates, and any new interactive objects or obstacles in the location.
+- **Player Location**: If the player moves to a new location, update the current location.
+- **Potential Locations**: If potential locations or paths are mentioned, return a list of the simple names.
+- **Player Inventory**: Keep the players inventory up to date.
+- **Interactive Objects**: Keep the list of interactive objects up to date.  If an item is altered, change the name and remove the old one.
+- **Enemies**: If an enemy is defeated, added or removed, update the enemies list.
+- **Story Threads**: A short summary of relavent plot updates, story notes, or other relavent story telling details.
 
-Story threads should be short, concise sentences that are relevant to the current game state. They should be updated to reflect the current state of the game and the player's actions and form a coherent narrative.
+**JSON Response Structure:**
 
-JSON Template For Response:
+Respond with a JSON object containing the following fields:
+
 {
   "current_location": "Location Name",
-  "new_potential_locations": ["New Locations mentioned in the response"],
-  "inventory_items_added": ["Items Acquired By The Player"],
-  "inventory_items_removed": ["Items Removed From Players Inventory"],
-  "interactive_objects_added": ["New interactive objects for this location"],
-  "interactive_objects_removed": ["Any objects that are no longer interacted or needed"],
-  "obstacles_added": ["New obstacles for this location"],
-  "enemies_added": ["New enemies for this location"],
-  "enemies_defeated": ["Enemies that were defeated"],
-  "updated_story_threads": ["A list of updated story threads to be appended to the current story threads list"]
+  "potential_locations": ["List of New Locations"],
+  "inventory_updates": {
+    "added": ["New Items"],
+    "removed": ["Removed Items"]
+  },
+  "interactive_objects_updates": {
+    "added": ["New Objects"],
+    "removed": ["Removed Objects"]
+  },
+  "enemies_updates": {
+    "added": ["New Enemies"],
+    "defeated": ["Defeated Enemies"]
+  },
+  "story_threads": ["Updated Narrative Points"]
 }
 
-**Examples:**
+**Example: Player Movement and Interaction**
 
-Current State:
+*Initial State:*
 {
-  "current_location": "Whispering Forest",
-
-Narrative Response: "You find yourself on the dark forest's edge, filled with whispers and the scent of adventure.  You see a path leading to the ancient ruins and a river to the east. You also notice a small, glowing object on the ground."
-
-State Change:
-{
-  "current_location": "Whispering Forest",
-  "new_potential_locations": ["Ancient Ruins", "Mystic River"],
-  "interactive_objects_added": ["Glowing Object"],
-  "updated_story_threads": ["The glowing orb likely has some significance."]
+  "current_location": "Small Village",
+  "player_inventory": ["Rusty Sword", "Torch"],
+  "interactive_objects": ["Old Well"],
+  "enemies": [],
+  "story_threads": [
+    "Seek the ancient ruins towards the far east.",
+    "The old well may hold power.",
+    "A monster lurks in the Whispering Forest."
+  ]
 }
 
+*Player Action:* Moves east towards ruins, encounters a bandit.
+
+*Update:*
+{
+  "current_location": "Eastern Road",
+  "new_potential_locations": ["Ancient Ruins"],
+  "enemies_updates": {
+    "added": ["Bandit"]
+  },
+  "story_threads": ["Encountered a bandit on the road to the ruins."]
+}
+
+*Further Action:* Player decides to return to the village.
+
+*Update:*
+{
+  "current_location": "Small Village",
+  "story_threads": ["Returned to the village avoiding the bandit for now."]
+}
 `
 
 var GAME_MASTER_RESPONSE_PROTOCOL_PROMPT = `
@@ -129,20 +139,4 @@ Combine the current game state, story threads, recent context, and the players p
 Respond with a concise and consistent narrative description of how the player's actions affect the game world. Encourage exploration and progression by aligning new elements with player actions and storylines.
 
 Obstacles should require strategy to overcome.  Simulate this by requiring the player to have certain items in their inventory or by requiring the player to have visited certain locations.
-`
-
-var STATE_MANAGER_RESPONSABILITY_PROMPT = `
-As the State Manager, you are responsible for managing the game state and ensuring that the game world evolves in response to player actions. You will be working closely with the Game Master to ensure that the game world is dynamic and engaging.
-
-You will be provided the current state of the game, and the most recent narrative context. Your role is to update the game state based on the player's actions and the game masters response.
-
-**Responsibilities:**
-
-- **Player Location**: If the player moves to a new location, update the current location.
-- **Adjacent Locations**: If additional locations are described near the current location, update the adjacent locations.
-- **Player Inventory**: When the player takes or drops an item change the players inventory to reflect the new or removed item.
-- **Interactive Objects**: If an interactive object is removed, broken or altered, update the interactive objects in the game state.
-- **Obstacles**: If an obstacle is overcome, defeated or altered, update the obstacles list.
-- **Enemies**: If an enemy is defeated, added or removed, update the enemies list.
-- **Story Threads**: If a story thread is updated, added or removed, update the story thread list.
 `

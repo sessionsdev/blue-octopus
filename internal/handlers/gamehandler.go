@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"html/template"
+	"log"
 	"net/http"
 	"time"
 
@@ -19,32 +20,43 @@ type UserPromptWithState struct {
 }
 
 type PreparedStats struct {
-	Location  string
-	Inventory []string
+	Location           string
+	PreviousLocation   string
+	PotentialLocations []string
+	Inventory          []string
+	Enemies            []string
+	InteractiveItems   []string
 }
 
 var PreparedStatsCache *PreparedStats = &PreparedStats{}
 
 func populatePreparedStatsCache(g *game.Game) {
 	PreparedStatsCache.Location = g.World.CurrentLocation.LocationName
-	PreparedStatsCache.Inventory = g.Player.Inventory
+	PreparedStatsCache.PreviousLocation = g.World.CurrentLocation.PreviousLocation
 
-	if len(PreparedStatsCache.Inventory) == 0 {
-		PreparedStatsCache.Inventory = []string{"You're not carrying anything."}
+	PreparedStatsCache.PotentialLocations = make([]string, 0, len(g.World.CurrentLocation.PotentialLocations))
+	for k := range g.World.CurrentLocation.PotentialLocations {
+		PreparedStatsCache.PotentialLocations = append(PreparedStatsCache.PotentialLocations, k)
+	}
+
+	PreparedStatsCache.Enemies = make([]string, 0, len(g.World.CurrentLocation.Enemies))
+	for k := range g.World.CurrentLocation.Enemies {
+		PreparedStatsCache.Enemies = append(PreparedStatsCache.Enemies, k)
+	}
+
+	PreparedStatsCache.InteractiveItems = make([]string, 0, len(g.World.CurrentLocation.InteractiveItems))
+	for k := range g.World.CurrentLocation.InteractiveItems {
+		PreparedStatsCache.InteractiveItems = append(PreparedStatsCache.InteractiveItems, k)
+	}
+
+	PreparedStatsCache.Inventory = make([]string, 0, len(g.Player.Inventory))
+	for k := range g.Player.Inventory {
+		PreparedStatsCache.Inventory = append(PreparedStatsCache.Inventory, k)
 	}
 }
 
 func clearPreparedStatsCache() {
 	PreparedStatsCache = &PreparedStats{}
-}
-
-func getGameIdCookieValue(r *http.Request) string {
-	cookie, err := r.Cookie("GameId")
-	if err != nil {
-		return ""
-	}
-
-	return cookie.Value
 }
 
 func setGameIdCookie(w http.ResponseWriter, gameId string) {
@@ -70,17 +82,6 @@ func clearGameIdCookie(w http.ResponseWriter) {
 }
 
 func ServeGamePage(w http.ResponseWriter, r *http.Request) {
-	var g *game.Game
-
-	// If game id gameIdFromCookie exists
-	gameIdFromCookie := getGameIdCookieValue(r)
-	if gameIdFromCookie == "" {
-		// If no game id cookie exists, create a new game
-		g = game.InitializeNewGame()
-		g.SaveGameToRedis()
-		setGameIdCookie(w, g.GameId)
-	}
-
 	tmpl, err := template.ParseFiles(
 		"templates/base.html",
 		"templates/header.html",
@@ -102,8 +103,6 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html")
-
 	// Decode the request body into a Command struct
 	command := r.FormValue("command")
 	if command == "" {
@@ -111,30 +110,45 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	g, _ := LoadGameOrInitializeNew(r)
-	result, err := g.ProcessGameCommand(command)
+	var gameId string
+	gameIdCookie, err := r.Cookie("GameId")
 	if err != nil {
-		executeTemplate(w, "templates/error-update.html", "game-update", result)
+		gameId = ""
 	} else {
+		gameId = gameIdCookie.Value
+	}
+
+	resultMsg, game, err := game.ProcessGameCommand(command, gameId)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/html")
+		executeTemplate(w, "templates/error-update.html", "game-update", resultMsg)
+	} else if game == nil {
+		w.Header().Set("Content-Type", "text/html")
+		executeTemplate(w, "templates/error-update.html", "game-update", resultMsg)
+	} else {
+		game.SaveGameToRedis()
+		populatePreparedStatsCache(game)
+
 		w.Header().Set("HX-Trigger-After-Settle", "stats-update")
+		w.Header().Set("Content-Type", "text/html")
+
+		if gameId != game.GameId {
+			setGameIdCookie(w, game.GameId)
+		}
+
 		executeTemplate(w, "templates/game-update.html", "game-update", struct {
 			PlayerCommand      string
 			GameMasterResponse string
 		}{
 			PlayerCommand:      command,
-			GameMasterResponse: result,
+			GameMasterResponse: resultMsg,
 		})
-
-		setGameIdCookie(w, g.GameId)
-		populatePreparedStatsCache(g)
-		g.SaveGameToRedis()
 	}
 }
 
 func ServeGameStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	executeTemplate(w, "templates/stats-panel.html", "stats-panel", PreparedStatsCache)
-	clearPreparedStatsCache()
 }
 
 func HandleGameState(w http.ResponseWriter, r *http.Request) {
@@ -142,13 +156,29 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Only GET requests are allowed", http.StatusMethodNotAllowed)
 	}
-	g, _ := LoadGameOrInitializeNew(r)
+
+	var gameId string
+	gameIdCookie, err := r.Cookie("GameId")
+	if err != nil {
+		log.Printf("Error getting game id from cookie: %s", err)
+		http.Error(w, "No game id found", http.StatusBadRequest)
+		return
+	} else {
+		gameId = gameIdCookie.Value
+	}
+
+	g, err := game.LoadGameFromRedis(gameId)
+	if err != nil {
+		http.Error(w, "Error loading game from redis", http.StatusInternalServerError)
+		return
+	}
 
 	jsonResponse, err := json.Marshal(g)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
+	populatePreparedStatsCache(g)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonResponse)
 }
@@ -164,19 +194,4 @@ func executeTemplate(w http.ResponseWriter, templateFile string, templateName st
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-func LoadGameOrInitializeNew(r *http.Request) (*game.Game, error) {
-	// get game id cookie
-	cookie, err := r.Cookie("GameId")
-	if err != nil {
-		return game.InitializeNewGame(), nil
-	}
-
-	g, err := game.LoadGameFromRedis(cookie.Value)
-	if err != nil || g == nil {
-		return game.InitializeNewGame(), nil
-	}
-
-	return g, nil
 }

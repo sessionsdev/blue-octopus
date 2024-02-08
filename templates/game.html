@@ -9,7 +9,7 @@
                 You are standing in an open field west of a blue house, with a boarded front door. There is a small mailbox here.
             </p>
         </div>
-        <div id="game-state-panel" hx-get="/api/stats-display" hx-trigger="stats-update from:body" hx-swap="innerHTML">
+        <div id="game-state-panel" hx-get="/api/stats-display" hx-trigger="every 3s" hx-swap="innerHTML">
             <p>Welcome to Adventure AI.  A text based Adventure Game</p>
 
             <p>
