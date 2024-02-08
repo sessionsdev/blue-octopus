@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"net/http"
 	"time"
@@ -79,16 +78,8 @@ func ServeGamePage(w http.ResponseWriter, r *http.Request) {
 		// If no game id cookie exists, create a new game
 		g = game.InitializeNewGame()
 		g.SaveGameToRedis()
-	} else {
-		loadedGame, err := game.LoadGameFromRedis(gameIdFromCookie)
-		if err != nil {
-			g = game.InitializeNewGame()
-			g.SaveGameToRedis()
-		}
-		g = loadedGame
+		setGameIdCookie(w, g.GameId)
 	}
-
-	setGameIdCookie(w, g.GameId)
 
 	tmpl, err := template.ParseFiles(
 		"templates/base.html",
@@ -111,6 +102,8 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "text/html")
+
 	// Decode the request body into a Command struct
 	command := r.FormValue("command")
 	if command == "" {
@@ -118,91 +111,72 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get game id cookie
-	cookie, err := r.Cookie("GameId")
+	g, _ := LoadGameOrInitializeNew(r)
+	result, err := g.ProcessGameCommand(command)
 	if err != nil {
-		http.Error(w, "No game id cookie found", http.StatusBadRequest)
-		return
-	}
+		executeTemplate(w, "templates/error-update.html", "game-update", result)
+	} else {
+		w.Header().Set("HX-Trigger-After-Settle", "stats-update")
+		executeTemplate(w, "templates/game-update.html", "game-update", struct {
+			PlayerCommand      string
+			GameMasterResponse string
+		}{
+			PlayerCommand:      command,
+			GameMasterResponse: result,
+		})
 
-	g, err := game.LoadGameFromRedis(cookie.Value)
-	if err != nil || g == nil {
-		if err != nil {
-			w.Write([]byte("Error loading game: " + err.Error()))
-		} else {
-			w.Write([]byte("No game found for id: " + cookie.Value))
-		}
-		return
-	}
-
-	var html string
-
-	switch command {
-	case "RESET GAME":
-		g = game.InitializeNewGame()
 		setGameIdCookie(w, g.GameId)
-		html = fmt.Sprintf("RESET GAME: New game created with id: %s", g.GameId)
-	default:
-		narrativeResponse, err := g.ProcessGameCommand(command)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		html = fmt.Sprintf("<p>PLAYER: %s\n<p>GAME MASTER: %s</p>", command, narrativeResponse)
+		populatePreparedStatsCache(g)
+		g.SaveGameToRedis()
 	}
-
-	populatePreparedStatsCache(g)
-	g.SaveGameToRedis()
-	setGameIdCookie(w, g.GameId)
-	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("HX-Trigger-After-Settle", "stats-update")
-	w.Write([]byte(html))
 }
 
 func ServeGameStats(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFiles("templates/stats-panel.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = t.Execute(w, PreparedStatsCache)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	clearPreparedStatsCache()
 	w.Header().Set("Content-Type", "text/html")
+	executeTemplate(w, "templates/stats-panel.html", "stats-panel", PreparedStatsCache)
+	clearPreparedStatsCache()
 }
 
 func HandleGameState(w http.ResponseWriter, r *http.Request) {
 	// For GET requests, return the current full game state
-	if r.Method == http.MethodGet {
-		// get game id cookie
-		cookie, err := r.Cookie("GameId")
-		if err != nil {
-			http.Error(w, "No game id cookie found", http.StatusBadRequest)
-			return
-		}
-
-		g, err := game.LoadGameFromRedis(cookie.Value)
-		if err != nil || g == nil {
-			if err != nil {
-				w.Write([]byte("Error loading game: " + err.Error()))
-			} else {
-				w.Write([]byte("No game found for id: " + cookie.Value))
-			}
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		newGameJson, err := json.Marshal(g)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-
-		w.Write(newGameJson)
+	if r.Method != http.MethodGet {
+		http.Error(w, "Only GET requests are allowed", http.StatusMethodNotAllowed)
 	}
+	g, _ := LoadGameOrInitializeNew(r)
+
+	jsonResponse, err := json.Marshal(g)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonResponse)
+}
+
+func executeTemplate(w http.ResponseWriter, templateFile string, templateName string, data interface{}) {
+	tmpl, err := template.ParseFiles(templateFile)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = tmpl.ExecuteTemplate(w, templateName, data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func LoadGameOrInitializeNew(r *http.Request) (*game.Game, error) {
+	// get game id cookie
+	cookie, err := r.Cookie("GameId")
+	if err != nil {
+		return game.InitializeNewGame(), nil
+	}
+
+	g, err := game.LoadGameFromRedis(cookie.Value)
+	if err != nil || g == nil {
+		return game.InitializeNewGame(), nil
+	}
+
+	return g, nil
 }

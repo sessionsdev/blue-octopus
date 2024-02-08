@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var Client *OpenAIClient
+var OpenAiClient *OpenAIClient
 
 var ModelMap = map[string]string{
 	"gpt3": "gpt-3.5-turbo-0125",
@@ -18,7 +18,7 @@ var ModelMap = map[string]string{
 }
 
 func init() {
-	Client = New(ModelMap["gpt3"], 0.7, ResponseFormat{Type: "text"})
+	OpenAiClient = New(ModelMap["gpt3"], 0.7, ResponseFormat{Type: "text"})
 }
 
 func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClient {
@@ -40,12 +40,8 @@ type OpenAiMessage struct {
 	Content string `json:"content"`
 }
 
-func (m OpenAiMessage) Provider() string {
-	return m.Role
-}
-
-func (m OpenAiMessage) Message() string {
-	return m.Content
+func (m *OpenAiMessage) NewMessage(provider string, message string) *OpenAiMessage {
+	return &OpenAiMessage{Role: provider, Content: message}
 }
 
 // ChatRequest is the request payload for the Chat API.
@@ -54,6 +50,19 @@ type ChatRequest struct {
 	Messages       []OpenAiMessage `json:"messages"`
 	Temperature    float64         `json:"temperature"`
 	ResponseFormat ResponseFormat  `json:"response_format"`
+}
+
+type OpenAiChatResponse struct {
+	Completion string `json:"completion"`
+	TokensUsed int    `json:"tokens_used"`
+}
+
+func (resp *OpenAiChatResponse) GetChatCompletion() string {
+	return resp.Completion
+}
+
+func (resp *OpenAiChatResponse) GetTokenUsage() int {
+	return resp.TokensUsed
 }
 
 type ResponseFormat struct {
@@ -86,12 +95,12 @@ type OpenAIResponse struct {
 	Usage             Usage    `json:"usage"`
 }
 
-func (resp *OpenAIResponse) GetFirstMessage() OpenAiMessage {
-	return resp.Choices[0].Message
+func (resp *OpenAIResponse) GetChatCompletion() string {
+	return resp.Choices[0].Message.Content
 }
 
-func (resp *OpenAIResponse) GetFirstChoiceContent() string {
-	return resp.Choices[0].Message.Content
+func (resp *OpenAIResponse) GetTokenUsage() int {
+	return resp.Usage.TotalTokens
 }
 
 type OpenAIClient struct {
@@ -103,37 +112,35 @@ type OpenAIClient struct {
 	ResponseFormat ResponseFormat
 }
 
-func (c *OpenAIClient) GetClientName() string {
-	return c.ClientName
-}
+func (c *OpenAIClient) DoRequest(userMessages []AiMessage) (*OpenAiChatResponse, error) {
+	openAiMessage := convertMessageType(userMessages)
 
-func (c *OpenAIClient) CallOpenAIChat(userMessages []OpenAiMessage) (OpenAIResponse, error) {
 	chatRequest := ChatRequest{
 		Model:          c.Model,
-		Messages:       userMessages,
+		Messages:       openAiMessage,
 		Temperature:    c.Temperature,
 		ResponseFormat: c.ResponseFormat,
 	}
 
 	requestBody, err := json.Marshal(chatRequest)
 	if err != nil {
-		return OpenAIResponse{}, fmt.Errorf("error marshaling request: %w", err)
+		log.Panicf("HERE I AM!")
+		return &OpenAiChatResponse{}, fmt.Errorf("error marshaling request: %w", err)
 	}
 
 	url := "https://api.openai.com/v1/chat/completions"
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestBody))
 	if err != nil {
-		return OpenAIResponse{}, fmt.Errorf("error creating request: %w", err)
+		return &OpenAiChatResponse{}, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
 	// Log request attempt
-	log.Print("REQUEST: CHAT COMPLETION API")
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return OpenAIResponse{}, fmt.Errorf("error making request: %w", err)
+		return &OpenAiChatResponse{}, fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -142,16 +149,25 @@ func (c *OpenAIClient) CallOpenAIChat(userMessages []OpenAiMessage) (OpenAIRespo
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
 		log.Printf("response body: %s", buf.String())
-		return OpenAIResponse{}, fmt.Errorf("received non-OK response status: %s", resp.Status)
+		return &OpenAiChatResponse{}, fmt.Errorf("received non-OK response status: %s", resp.Status)
 	}
-
-	// log successful response code
-	log.Printf("OPEN AI REPONSE STATUS: %s", resp.Status)
 
 	var openAiResponse OpenAIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&openAiResponse); err != nil {
-		return OpenAIResponse{}, fmt.Errorf("error decoding response: %w", err)
+		return &OpenAiChatResponse{}, fmt.Errorf("error decoding response: %w", err)
 	}
 
-	return openAiResponse, nil
+	return &OpenAiChatResponse{
+		Completion: openAiResponse.GetChatCompletion(),
+		TokensUsed: openAiResponse.GetTokenUsage(),
+	}, nil
+}
+
+func convertMessageType(messages []AiMessage) []OpenAiMessage {
+	var openAiMessages []OpenAiMessage
+	for _, m := range messages {
+		log.Printf("Message Pre Conversion: %s", m.Message)
+		openAiMessages = append(openAiMessages, OpenAiMessage{Role: m.Provider, Content: m.Message})
+	}
+	return openAiMessages
 }

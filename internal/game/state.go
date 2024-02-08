@@ -4,62 +4,39 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/gob"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
-	"github.com/sessionsdev/blue-octopus/internal/aiapi"
 	"github.com/sessionsdev/blue-octopus/internal/redis"
 )
 
 func init() {
-	gob.Register(aiapi.OpenAiMessage{})
+	gob.Register(GameMessage{})
 }
 
 type GameStateDetails struct {
 	CurrentLocation       string   `json:"current_location"`
+	PreviousLocation      string   `json:"previous_location"`
 	AdjacentLocationNames []string `json:"adjacent_locations"`
 	Inventory             []string `json:"player_inventory"`
-	InteractiveItems      []string `json:"interactive_objects_in_location"`
-	Obstacles             []string `json:"obstacles_in_location"`
+	InteractiveItems      []string `json:"interactive_objects"`
+	Obstacles             []string `json:"obstacles"`
+	Enemies               []string `json:"enemies"`
 	StoryThreads          []string `json:"story_threads"`
 }
 
 func (g *Game) BuildGameStateDetails() GameStateDetails {
-	currentLocation := g.World.CurrentLocation
-	player := g.Player
-
-	if currentLocation == nil {
-		currentLocation = &Location{}
-	}
-
-	if player == nil {
-		player = &Player{}
-	}
-
-	adjacentLocationNames := make([]string, len(currentLocation.AdjacentLocations))
-	for i, location := range currentLocation.AdjacentLocations {
-		adjacentLocationNames[i] = location
-	}
-
 	return GameStateDetails{
-		CurrentLocation:       currentLocation.LocationName,
-		AdjacentLocationNames: adjacentLocationNames,
+		CurrentLocation:       g.World.CurrentLocation.LocationName,
+		PreviousLocation:      g.World.CurrentLocation.PreviousLocation,
+		AdjacentLocationNames: g.World.CurrentLocation.potentialLocations,
 		Inventory:             g.Player.Inventory,
-		InteractiveItems:      currentLocation.InteractiveItems,
+		InteractiveItems:      g.World.CurrentLocation.InteractiveItems,
+		Obstacles:             g.World.CurrentLocation.Obstacles,
+		Enemies:               g.World.CurrentLocation.Enemies,
 		StoryThreads:          g.StoryThreads,
-		Obstacles:             currentLocation.Obstacles,
 	}
-}
-
-func (gs *GameStateDetails) GetJsonOrEmptyString() string {
-	jsonString, err := json.Marshal(gs)
-	if err != nil {
-		return ""
-	}
-
-	return string(jsonString)
 }
 
 func (g *Game) UpdateGameHistory(userMessage GameMessage, assistantMessage GameMessage) {
@@ -93,10 +70,10 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateDetails) {
 
 		if locationToUpdate == nil {
 			locationToUpdate = &Location{
-				LocationName:      proposedLocationName,
-				Obstacles:         []string{},
-				InteractiveItems:  []string{},
-				AdjacentLocations: []string{g.World.CurrentLocation.LocationName},
+				LocationName:       proposedLocationName,
+				Obstacles:          []string{},
+				InteractiveItems:   []string{},
+				potentialLocations: []string{g.World.CurrentLocation.LocationName},
 			}
 
 			g.World.Locations[normalized] = locationToUpdate
@@ -126,10 +103,10 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateDetails) {
 			// if adjacent location does not exist, create it
 			if adjacentLocation == nil {
 				adjacentLocation = &Location{
-					LocationName:      potientialAdjacentLocation,
-					Obstacles:         []string{},
-					InteractiveItems:  []string{},
-					AdjacentLocations: []string{locationToUpdate.LocationName},
+					LocationName:       potientialAdjacentLocation,
+					Obstacles:          []string{},
+					InteractiveItems:   []string{},
+					potentialLocations: []string{locationToUpdate.LocationName},
 				}
 
 				// add the new location to the world
@@ -138,7 +115,7 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateDetails) {
 		}
 	}
 
-	g.World.UpdateCurrentLocation(locationToUpdate)
+	g.World.NextLocation(locationToUpdate)
 }
 
 func contains(arr []string, str string) bool {
@@ -190,7 +167,7 @@ func buildInitialWorldLocations() map[string]*Location {
 			"Mailbox",
 			"Borded Door",
 		},
-		AdjacentLocations: []string{},
+		potentialLocations: []string{},
 	}
 
 	riverLocation := &Location{
@@ -200,7 +177,7 @@ func buildInitialWorldLocations() map[string]*Location {
 			"Hidden Boat",
 			"Fish",
 		},
-		AdjacentLocations: []string{
+		potentialLocations: []string{
 			blueHouse.LocationName,
 		},
 	}
@@ -212,12 +189,12 @@ func buildInitialWorldLocations() map[string]*Location {
 			"Sign",
 			"Tree",
 		},
-		AdjacentLocations: []string{
+		potentialLocations: []string{
 			blueHouse.LocationName,
 		},
 	}
 
-	blueHouse.AdjacentLocations = append(blueHouse.AdjacentLocations, riverLocation.LocationName, theRoadLocation.LocationName)
+	blueHouse.potentialLocations = append(blueHouse.potentialLocations, riverLocation.LocationName, theRoadLocation.LocationName)
 
 	locations := make(map[string]*Location)
 	locations[theRoadLocation.getNormalizedName()] = theRoadLocation
@@ -275,12 +252,8 @@ func LoadGameFromRedis(gameId string) (*Game, error) {
 
 	encodedGame, err := redis.GetGob(gameId)
 	if err != nil {
-		if _, ok := err.(*redis.NotFoundError); ok {
-			return nil, err
-		} else if err != nil {
-			log.Printf("Error loading game from redis: %s", gameId)
-			log.Fatal(err)
-		}
+		log.Printf("Error loading game from redis: %s", err)
+		return nil, err
 	}
 
 	return decodeGame(encodedGame), nil

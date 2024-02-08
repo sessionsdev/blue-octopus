@@ -5,10 +5,12 @@ import (
 )
 
 type Location struct {
-	LocationName      string   `json:"location_name"`
-	InteractiveItems  []string `json:"interactive_items"`
-	AdjacentLocations []string `json:"adjacent_locations"`
-	Obstacles         []string `json:"obstacles"`
+	LocationName       string
+	PreviousLocation   string
+	InteractiveItems   []string
+	potentialLocations []string
+	Obstacles          []string
+	Enemies            []string
 }
 
 func (l *Location) getNormalizedName() string {
@@ -17,31 +19,28 @@ func (l *Location) getNormalizedName() string {
 }
 
 type World struct {
-	Locations       map[string]*Location `json:"locations"`
-	CurrentLocation *Location            `json:"current_location"`
+	Locations       map[string]*Location
+	CurrentLocation *Location
 }
 
-func (w *World) UpdateCurrentLocation(newLocation *Location) {
+func (w *World) NextLocation(newLocation *Location) {
+	// new location doesn't exist in the world, add it
+	w.SafeAddLocation(newLocation)
+	newLocation.PreviousLocation = w.CurrentLocation.LocationName
 	w.CurrentLocation = newLocation
 }
 
-func (w *World) VisualizeLocationTree() string {
-	visited := make(map[*Location]bool)
-	return w.dfs(w.CurrentLocation, visited, "")
+func (w *World) GetLocationByName(locationName string) (*Location, bool) {
+	normalized := strings.ReplaceAll(strings.ToLower(locationName), " ", "_")
+	location, ok := w.Locations[normalized]
+	return location, ok
 }
 
-func (w *World) dfs(location *Location, visited map[*Location]bool, indent string) string {
-	if visited[location] {
-		return ""
+func (w *World) SafeAddLocation(location *Location) {
+	normalized := location.getNormalizedName()
+	_, ok := w.Locations[normalized]
+	if !ok {
+		w.Locations[normalized] = location
+		return
 	}
-
-	visited[location] = true
-	result := indent + location.LocationName + "\n"
-
-	for _, adjacentLocation := range location.AdjacentLocations {
-		realLocation := w.Locations[adjacentLocation]
-		result += w.dfs(realLocation, visited, indent+"\t")
-	}
-
-	return result
 }
