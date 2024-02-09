@@ -29,15 +29,17 @@ func ProcessGameCommand(command string, gameId string) (string, *Game, error) {
 }
 
 func (g *Game) processPlayerPrompt(command string) (string, error) {
-	gameState := BuildGameStatePrompt(g)
-	gameStateMsg := GameMessage{Provider: "system", Message: gameState}
-	userMsg := GameMessage{Provider: "user", Message: command}
-
-	history := g.GetRecentHistory(10)
 	messages := []GameMessage{}
 	messages = append(messages, GameMessage{Provider: "system", Message: GAME_MASTER_RESPONSABILITY_PROMPT})
-	messages = append(messages, gameStateMsg)
+
+	history := g.GetRecentHistory(10)
 	messages = append(messages, history...)
+
+	gameState := BuildGameStatePrompt(g)
+	gameStateMsg := GameMessage{Provider: "system", Message: gameState}
+	messages = append(messages, gameStateMsg)
+
+	userMsg := GameMessage{Provider: "user", Message: command}
 	messages = append(messages, userMsg)
 
 	// Call the OpenAI Chat API using the client
@@ -63,11 +65,11 @@ func (g *Game) processPlayerPrompt(command string) (string, error) {
 func (g *Game) ReconcileGameState() {
 	messages := []GameMessage{
 		{Provider: "system", Message: STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT},
-		{Provider: "system", Message: BuildGameStatePrompt(g)},
 	}
 
 	messages = append(messages, g.GetRecentHistory(10)...)
-	messages = append(messages, GameMessage{Provider: "user", Message: "Reconcile the game state with the recent conversation history."})
+	messages = append(messages, GameMessage{Provider: "user", Message: "Reconcile the following game state with the recent conversation history."})
+	messages = append(messages, GameMessage{Provider: "user", Message: BuildGameStatePrompt(g)})
 
 	// Call the OpenAI Chat API using the client
 	response, err := callClient("openai-json", messages)

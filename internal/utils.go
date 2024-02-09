@@ -13,14 +13,6 @@ func GetStringsFromMap(m map[string]struct{}) []string {
 	return s
 }
 
-func MakeSet(elements ...string) StringSet {
-	s := make(StringSet)
-	for _, e := range elements {
-		s[e] = member
-	}
-	return s
-}
-
 func EmptyStringSet() StringSet {
 	return make(StringSet)
 }
@@ -52,4 +44,13 @@ func (s StringSet) RemoveAll(elements ...string) {
 func (s StringSet) Contains(element string) bool {
 	_, ok := s[element]
 	return ok
+}
+
+func Contains(stringSlice []string, element string) bool {
+	for _, s := range stringSlice {
+		if s == element {
+			return true
+		}
+	}
+	return false
 }

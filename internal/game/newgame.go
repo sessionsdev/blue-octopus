@@ -25,7 +25,7 @@ func InitializeNewGame() *Game {
 
 	player := &Player{
 		Name:      "Adventurer",
-		Inventory: utils.EmptyStringSet(),
+		Inventory: []string{},
 	}
 
 	newGame.Player = player
@@ -41,18 +41,18 @@ func InitializeNewGame() *Game {
 }
 
 func buildInitialWorldLocations(world *World) {
-	blueHouse, _ := world.SafeAddLocation("Blue House")
-	blueHouse.InteractiveItems.AddAll("Locked Door")
-	blueHouse.AdjacentLocations.AddAll("Eastern Road", "River")
+	blueHouse := world.SafeAddLocation("Blue House")
+	blueHouse.InteractiveItems = append(blueHouse.InteractiveItems, "Locked Door")
+	blueHouse.AdjacentLocations = append(blueHouse.AdjacentLocations, "River", "Eastern Road")
 
-	river, _ := world.SafeAddLocation("River")
-	river.InteractiveItems.AddAll("Boat", "Risky Bridge")
-	river.AdjacentLocations.AddAll("Blue House")
+	river := world.SafeAddLocation("River")
+	river.InteractiveItems = append(river.InteractiveItems, "Bridge")
+	river.AdjacentLocations = append(river.AdjacentLocations, "Blue House")
 
-	easternRoad, _ := world.SafeAddLocation("Eastern Road")
-	easternRoad.InteractiveItems.AddAll("Sign")
-	easternRoad.Enemies.AddAll("Goblin")
-	easternRoad.AdjacentLocations.AddAll("Blue House")
+	easternRoad := world.SafeAddLocation("Eastern Road")
+	easternRoad.InteractiveItems = append(easternRoad.InteractiveItems, "Cave Entrance")
+	easternRoad.Enemies = append(easternRoad.Enemies, "Goblin")
+	easternRoad.AdjacentLocations = append(easternRoad.AdjacentLocations, "Blue House", "Cave")
 }
 
 func randomId() (s string, err error) {
@@ -77,7 +77,7 @@ func initializeEmptyGame() *Game {
 		},
 		Player: &Player{
 			Name:      "",
-			Inventory: utils.EmptyStringSet(),
+			Inventory: []string{},
 		},
 		MainQuest:          "",
 		StoryThreads:       []string{},

@@ -1,6 +1,7 @@
 package game
 
 import (
+	"log"
 	"strings"
 
 	utils "github.com/sessionsdev/blue-octopus/internal"
@@ -8,9 +9,22 @@ import (
 
 type Location struct {
 	LocationName      string
-	AdjacentLocations utils.StringSet
-	InteractiveItems  utils.StringSet
-	Enemies           utils.StringSet
+	AdjacentLocations []string
+	InteractiveItems  []string
+	Enemies           []string
+}
+
+func (l *Location) SafeAddAdjacentLocation(newAdjacentLocation string) []string {
+	if l.AdjacentLocations == nil {
+		l.AdjacentLocations = []string{}
+	}
+
+	currentAdjacentLocations := l.AdjacentLocations
+	if !utils.Contains(currentAdjacentLocations, newAdjacentLocation) {
+		l.AdjacentLocations = append(currentAdjacentLocations, newAdjacentLocation)
+	}
+
+	return l.AdjacentLocations
 }
 
 func (l *Location) getNormalizedName() string {
@@ -30,6 +44,9 @@ func (w *World) NextLocation(nextLocation *Location) *Location {
 		return w.CurrentLocation
 	}
 
+	log.Printf("Current location: %s", w.CurrentLocation.LocationName)
+	log.Printf("Next location: %s", nextLocation.LocationName)
+
 	// determine which direction we moved by looking at the current location directions and the next location name
 
 	if w.VisitedLocations == nil {
@@ -40,8 +57,9 @@ func (w *World) NextLocation(nextLocation *Location) *Location {
 	w.VisitedLocations.AddAll(w.CurrentLocation.LocationName, nextLocation.LocationName)
 
 	// update previous, current locations and adjacent locations
-	w.CurrentLocation.AdjacentLocations.AddAll(nextLocation.LocationName)
-	nextLocation.AdjacentLocations.AddAll(w.CurrentLocation.LocationName)
+	w.CurrentLocation.AdjacentLocations = append(w.CurrentLocation.AdjacentLocations, nextLocation.LocationName)
+	nextLocation.AdjacentLocations = append(nextLocation.AdjacentLocations, w.CurrentLocation.LocationName)
+
 	w.PreviousLocation = w.CurrentLocation
 	w.CurrentLocation = nextLocation
 	return w.CurrentLocation
@@ -57,13 +75,13 @@ func (w *World) GetLocationByName(locationName string) (*Location, bool) {
 	return location, ok
 }
 
-func (w *World) SafeAddLocation(locationName string) (*Location, bool) {
+func (w *World) SafeAddLocation(locationName string) *Location {
 	if w.Locations == nil {
 		w.Locations = make(map[string]*Location)
 	}
 
 	if locationName == "" {
-		return nil, false
+		return nil
 	}
 
 	// normalize the location name
@@ -72,21 +90,24 @@ func (w *World) SafeAddLocation(locationName string) (*Location, bool) {
 
 	// check if the location already exists
 	location, ok := w.Locations[normalizedName]
+	log.Println("Location already exists: ", locationName)
 
 	// if it doesn't exist, create it
 	if !ok {
 		location = &Location{
-			LocationName:     locationName,
-			InteractiveItems: utils.EmptyStringSet(),
-			Enemies:          utils.EmptyStringSet(),
+			LocationName:      locationName,
+			AdjacentLocations: []string{},
+			InteractiveItems:  []string{},
+			Enemies:           []string{},
 		}
 
 		// add the location to the world
-		w.Locations[location.getNormalizedName()] = location
+		log.Println("Adding location: ", locationName)
+		w.Locations[normalizedName] = location
 	}
 
 	// return the location and whether it was added
-	return location, true
+	return location
 }
 
 func (w *World) SafePreviousLocation() *Location {

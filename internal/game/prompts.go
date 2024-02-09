@@ -32,11 +32,10 @@ var GAME_MASTER_STATE_PROMPT = `
   current_location: %s,
   previous_location: %s,
   adjacent_locations: [%s],
+  players_inventory: [%s],
   enemies": [%s],
   interactive_objects: [%s],
-  story_threads: [
-    %s
-  ]
+  story_threads: [%s]
 }
 `
 
@@ -52,9 +51,10 @@ func BuildGameStatePrompt(g *Game) string {
 		mainQuest,
 		currentLocationName,
 		previousLocationName,
-		strings.Join(currentLocation.AdjacentLocations.ToSlice(), ", "),
-		strings.Join(currentLocation.Enemies.ToSlice(), ", "),
-		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "),
+		strings.Join(currentLocation.AdjacentLocations, ", "),
+		strings.Join(g.Player.Inventory, ", "),
+		strings.Join(currentLocation.Enemies, ", "),
+		strings.Join(currentLocation.InteractiveItems, ", "),
 		getFormattedList(g.StoryThreads))
 
 	log.Println("GAME_STATE_PROMPT: ", prompt)
@@ -80,82 +80,28 @@ Respond with a JSON object containing the following fields:
 
 {
   "current_location": "Location Name",
-  "adjacent_locations_added": ["New Adjacent Locations"],
-  "inventory_updates": {
-    "added": ["New Items"],
-    "removed": ["Removed Items"]
-  },
-  "interactive_objects_updates": {
-    "added": ["New Objects"],
-    "removed": ["Removed Objects"]
-  },
-  "enemies_updates": {
-    "added": ["New Enemies"],
-    "defeated": ["Defeated Enemies"]
-  },
-  "story_threads": ["Updated Narrative Points"]
+  "adjacent_locations": ["existing", "and", "added", "adjacent", "locations"],
+  "player_inventory": ["complete", "list", "of", "player", "inventory"],
+  "interactive_objects": ["complete", "list", "of", "interactive", "objects"],
+  "enemies": ["complete", "list", "of", "enemies"],
+  "new_story_threads": ["new", "story", "threads", "to", "append"]
 }
 
 **Examples:**
 
 *Initial Provided State:*
 {
-  "current_location": "Small Village",
-  "adjacent_locations": ["Eastern Road", "River"],
-  "player_inventory": ["Rusty Sword", "Torch"],
-  "interactive_objects": ["Old Well"],
-  "enemies": [],
-  "story_threads": [
-    "Seek the ancient ruins towards the far east.",
-    "The old well may hold power.",
-    "A monster lurks in the Whispering Forest."
-  ]
+  "main_quest": "Find the lost treasure",
+  "current_location": "Mountain Pass",
+  "previous_location": "Village",
+  "adjacent_locations": ["Forest", "Cave"],
+  "player_inventory": ["sword", "shield", "potion"],
+  "enemies": ["goblin", "skeleton", "dragon"],
+  "interactive_objects": ["chest", "door", "key"],
+  "story_threads": ["meet the blacksmith", "explore the forest"]
 }
 
-*Player Action:* Moves east.
-*Narrative Update*:  You head east down the sun beaten path.  You arrive at a fork in the road.  To the north is a small hamlet, to the south is a river.  As you get close to read the sign, a goblin jumps from the bushes.
-
-*Update:*
-{
-  "current_location": "Eastern Road",
-  "player_traveled": true,
-  "direction_traveled": "east",
-  "adjacent_locations_added": ["Small Hamlet", "River", "Far Eastern Road"],
-  "enemies_updates": {
-    "added": ["Goblin"]
-  },
-  "story_threads": [
-    "There is a fork in the Eastern Road being guarded by a goblin."
-    ]
-
-*Player Action:* Attacks goblin.
-*Narrative Update*: You swing your sword at the goblin, but it dodges and counter attacks.  You are wounded and the goblin is still standing.  You can try to fight again or retreat to the village.
-
-*Update:*
-{
-  "current_location": "Eastern Road",
-  "player_traveled": false,
-  "story_threads": ["The player is wounded and the goblin is still standing."]
-}
-
-*Player Action:* Retreats to the village.
-*Narrative Update*: You retreat to the village and the goblin does not follow.  You are safe for now.
-
-*Update:*
-{
-  "current_location": "Small Village",
-  "player_traveled": true,
-  "direction_traveled": "west",
-  "story_threads": ["The player has retreated to the village, the goblin still standing at the fork."]
-}
-
-*Player Action:* Explores the village.
-*Narrative Update*: You explore the village and find a blacksmith, a tavern, and a small market.  The villagers are friendly and offer to help you if you need it.
-
-*Update:*
-{
-  "current_location": "Small Village",
-  "player_traveled": false,
-  "story_threads": ["The player has found a blacksmith, a tavern, and a small market in the Small Village."]
-}
+*Player Action:*
+Player: "Go into the cave"
+Assistant: "You find yourself in a dark cave.  The air is damp and the sound of dripping water echoes through the chamber.  You can see a faint light to the north."
 `
