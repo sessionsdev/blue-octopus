@@ -1,85 +1,86 @@
 package game
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+	"strings"
+)
 
 var GAME_MASTER_RESPONSABILITY_PROMPT = `
-You are the Game Master in a text based role playing adventure. Your role is to guide the player through a dynamically evolving world, creating locations, characters, and storylines in response to their journey. Your narrative should adapt to player actions, enriching the game with new challenges and discoveries.
+You are the Game Master in a text based role playing adventure.  Inspired by text based interactive fiction games like Zork, Colossal Cave Adventure, and the Choose Your Own Adventure series.
 
-Your responsibilities include:
-- Creative World-Building: Continuously introduce new locations, characters, and items, enriching the game world.
-- Engaging Narration: Provide vivid descriptions of scenes, characters, and challenges, enhancing the immersive experience.
-- Challenge Simulation: Design encounters requiring strategy, making gameplay rewarding.  Puzzles and obstacles can require specific items or multiple prompts to overcome.
-- Combat Simulation: In combat scenarios, allow the enemies to sometimes harm the player or to respond creatively to the players actions.  Don't make combat too easy or too hard.  But allow for retreat or creative solutions.
-- Storytelling: Craft a narrative that evolves with player actions, steering the game towards resolution of the main quest line.  Use the current context and story notes so far to help guide the story.
+Your task is to narrate the game world and respond to player actions.  You can invent new puzzles, stories, new locations, items, enemies and characters to interact with using the current game state, story threads and conversation history as a guide.
+
+**Response Protocol:**
+
+- Responses should be brief and to the point.
+- Responses should be in the form of a narrative update based on the players actions.
+- Do not allow the player to easily invent new items or locations, to easily bypass puzzles or riddles, or to instantly defeat enemies.
+- There are various types of commands you can respond to:
+  - Respond to travel commands (e.g. "go north", "go through the door", "go upstairs") with a narrative update of the new named location and any encounters or discoveries within.  Each unique location should have a unique name and description.
+  - Respond to basic action commands (e.g. "drink the potion", "take the coin", "drop my sword on the ground") with a simple update of the result of the action and any changes to the game state (e.g. "You take the strange coin").
+  - Respond to combat commands (e.g. "attack the goblin", "block the attack!") with a description of the encounter and the result of the action (e.g. "You swing your sword at the goblin, but it dodges and counter attacks.  You are wounded and the goblin is still standing.  You can try to fight again or retreat to the village.").
+  - Respond to conversation commands (e.g. "talk to the blacksmith", "ask the villager about the ruins") with a description of the encounter and the result of the action (e.g. "The blacksmith tells you about the ancient ruins to the east.  He offers to sell you a new sword if you need it.").
+  - Respond to item interaction commands (e.g. "use the key on the door", "open the chest", "light the torch") with a description of the result of the action and any changes to the game state (e.g. "You use the key on the door and it unlocks.  You can now enter the room.").
+  - Respond to query commands (e.g. "look around", "check my inventory", "examine the room") with a description of the current location and any items or enemies present (e.g. "You are in a small village.  There is a blacksmith, a tavern, and a small market.  The villagers are friendly and offer to help you if you need it.").
 `
 
 var GAME_MASTER_STATE_PROMPT = `
-The player is has embarked on a quest to %s.  They now find themselves located at [%s], having just left [%s].  The potential locations from here might include: [%v] 
-
-The enemies in the current location are: [%v]
-
-The interactive objects in the current location are: [%v]
-
-The current story threads are:
-%v
-
-The player may or may not be aware of these details based on previous responses and you can invent new locations, obstacles, items, enemies and story lines as needed.  
-Respond with a concise and consistent narrative description of how the player's actions affect the game world. Encourage exploration and progression by aligning new elements with player actions and storylines.
-
-[Player Prompt]
-%s
+[Current Game State]
+{
+  main_quest: %s,
+  current_location: %s,
+  previous_location: %s,
+  adjacent_locations: [%s],
+  enemies": [%s],
+  interactive_objects: [%s],
+  story_threads: [
+    %s
+  ]
+}
 `
 
-func BuildGameMasterStatePrompt(g *Game, command string) string {
+func BuildGameStatePrompt(g *Game) string {
 	mainQuest := g.MainQuest
 	currentLocation := g.World.CurrentLocation
 	currentLocationName := currentLocation.LocationName
-	previousLocation, ok := g.World.GetLocationByName(currentLocation.PreviousLocation)
-	if !ok {
-		previousLocation = &Location{LocationName: "An Unknown Location"}
-	}
+	previousLocation := g.World.SafePreviousLocation()
 	previousLocationName := previousLocation.LocationName
-	adjacentLocations := g.World.CurrentLocation.PotentialLocations
-	// build a string and for each story thread, append it with a - and a new line
-	var storyThreads string
-	for _, thread := range g.StoryThreads {
-		storyThreads += fmt.Sprintf("- %s\n", thread)
-	}
 
 	prompt := fmt.Sprintf(
 		GAME_MASTER_STATE_PROMPT,
 		mainQuest,
 		currentLocationName,
 		previousLocationName,
-		adjacentLocations,
-		currentLocation.Enemies,
-		currentLocation.InteractiveItems,
-		storyThreads,
-		command)
+		strings.Join(currentLocation.AdjacentLocations.ToSlice(), ", "),
+		strings.Join(currentLocation.Enemies.ToSlice(), ", "),
+		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "),
+		getFormattedList(g.StoryThreads))
+
+	log.Println("GAME_STATE_PROMPT: ", prompt)
 	return prompt
+}
+
+func getFormattedList(list []string) string {
+	var returnString string = ""
+	for _, item := range list {
+		returnString += fmt.Sprintf("- %s\n", item)
+	}
+	return returnString
 }
 
 var STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT = `
 Your task is to update the game state based on a narrative context and current state of the game.
 
-You will be provided the current state of the game in a json structure, and the most recent narrative context. Your role is to update the game state based on the player's actions and the game masters narrative response.
-
-**Responsibilities:**
-
-- **Player Location**: If the player moves to a new location, update the current location.
-- **Potential Locations**: If potential locations or paths are mentioned, return a list of the simple names.
-- **Player Inventory**: Keep the players inventory up to date.
-- **Interactive Objects**: Keep the list of interactive objects up to date.  If an item is altered, change the name and remove the old one.
-- **Enemies**: If an enemy is defeated, added or removed, update the enemies list.
-- **Story Threads**: A short summary of relavent plot updates, story notes, or other relavent story telling details.
-
 **JSON Response Structure:**
+
+State updates will always apply to the current location in the response.
 
 Respond with a JSON object containing the following fields:
 
 {
   "current_location": "Location Name",
-  "potential_locations": ["List of New Locations"],
+  "adjacent_locations_added": ["New Adjacent Locations"],
   "inventory_updates": {
     "added": ["New Items"],
     "removed": ["Removed Items"]
@@ -95,11 +96,12 @@ Respond with a JSON object containing the following fields:
   "story_threads": ["Updated Narrative Points"]
 }
 
-**Example: Player Movement and Interaction**
+**Examples:**
 
-*Initial State:*
+*Initial Provided State:*
 {
   "current_location": "Small Village",
+  "adjacent_locations": ["Eastern Road", "River"],
   "player_inventory": ["Rusty Sword", "Torch"],
   "interactive_objects": ["Old Well"],
   "enemies": [],
@@ -110,33 +112,50 @@ Respond with a JSON object containing the following fields:
   ]
 }
 
-*Player Action:* Moves east towards ruins, encounters a bandit.
+*Player Action:* Moves east.
+*Narrative Update*:  You head east down the sun beaten path.  You arrive at a fork in the road.  To the north is a small hamlet, to the south is a river.  As you get close to read the sign, a goblin jumps from the bushes.
 
 *Update:*
 {
   "current_location": "Eastern Road",
-  "new_potential_locations": ["Ancient Ruins"],
+  "player_traveled": true,
+  "direction_traveled": "east",
+  "adjacent_locations_added": ["Small Hamlet", "River", "Far Eastern Road"],
   "enemies_updates": {
-    "added": ["Bandit"]
+    "added": ["Goblin"]
   },
-  "story_threads": ["Encountered a bandit on the road to the ruins."]
+  "story_threads": [
+    "There is a fork in the Eastern Road being guarded by a goblin."
+    ]
+
+*Player Action:* Attacks goblin.
+*Narrative Update*: You swing your sword at the goblin, but it dodges and counter attacks.  You are wounded and the goblin is still standing.  You can try to fight again or retreat to the village.
+
+*Update:*
+{
+  "current_location": "Eastern Road",
+  "player_traveled": false,
+  "story_threads": ["The player is wounded and the goblin is still standing."]
 }
 
-*Further Action:* Player decides to return to the village.
+*Player Action:* Retreats to the village.
+*Narrative Update*: You retreat to the village and the goblin does not follow.  You are safe for now.
 
 *Update:*
 {
   "current_location": "Small Village",
-  "story_threads": ["Returned to the village avoiding the bandit for now."]
+  "player_traveled": true,
+  "direction_traveled": "west",
+  "story_threads": ["The player has retreated to the village, the goblin still standing at the fork."]
 }
-`
 
-var GAME_MASTER_RESPONSE_PROTOCOL_PROMPT = `
-**Response Protocol:**
+*Player Action:* Explores the village.
+*Narrative Update*: You explore the village and find a blacksmith, a tavern, and a small market.  The villagers are friendly and offer to help you if you need it.
 
-Combine the current game state, story threads, recent context, and the players prompt to help develope the story and the world. You can invent new locations, obstacles, items and story lines. 
-
-Respond with a concise and consistent narrative description of how the player's actions affect the game world. Encourage exploration and progression by aligning new elements with player actions and storylines.
-
-Obstacles should require strategy to overcome.  Simulate this by requiring the player to have certain items in their inventory or by requiring the player to have visited certain locations.
+*Update:*
+{
+  "current_location": "Small Village",
+  "player_traveled": false,
+  "story_threads": ["The player has found a blacksmith, a tavern, and a small market in the Small Village."]
+}
 `

@@ -19,46 +19,6 @@ type UserPromptWithState struct {
 	ProposedStateChanges string `json:"proposed_state_changes"`
 }
 
-type PreparedStats struct {
-	Location           string
-	PreviousLocation   string
-	PotentialLocations []string
-	Inventory          []string
-	Enemies            []string
-	InteractiveItems   []string
-}
-
-var PreparedStatsCache *PreparedStats = &PreparedStats{}
-
-func populatePreparedStatsCache(g *game.Game) {
-	PreparedStatsCache.Location = g.World.CurrentLocation.LocationName
-	PreparedStatsCache.PreviousLocation = g.World.CurrentLocation.PreviousLocation
-
-	PreparedStatsCache.PotentialLocations = make([]string, 0, len(g.World.CurrentLocation.PotentialLocations))
-	for k := range g.World.CurrentLocation.PotentialLocations {
-		PreparedStatsCache.PotentialLocations = append(PreparedStatsCache.PotentialLocations, k)
-	}
-
-	PreparedStatsCache.Enemies = make([]string, 0, len(g.World.CurrentLocation.Enemies))
-	for k := range g.World.CurrentLocation.Enemies {
-		PreparedStatsCache.Enemies = append(PreparedStatsCache.Enemies, k)
-	}
-
-	PreparedStatsCache.InteractiveItems = make([]string, 0, len(g.World.CurrentLocation.InteractiveItems))
-	for k := range g.World.CurrentLocation.InteractiveItems {
-		PreparedStatsCache.InteractiveItems = append(PreparedStatsCache.InteractiveItems, k)
-	}
-
-	PreparedStatsCache.Inventory = make([]string, 0, len(g.Player.Inventory))
-	for k := range g.Player.Inventory {
-		PreparedStatsCache.Inventory = append(PreparedStatsCache.Inventory, k)
-	}
-}
-
-func clearPreparedStatsCache() {
-	PreparedStatsCache = &PreparedStats{}
-}
-
 func setGameIdCookie(w http.ResponseWriter, gameId string) {
 	twentyFourHours := 24 * time.Hour
 
@@ -127,8 +87,6 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 		executeTemplate(w, "templates/error-update.html", "game-update", resultMsg)
 	} else {
 		game.SaveGameToRedis()
-		populatePreparedStatsCache(game)
-
 		w.Header().Set("HX-Trigger-After-Settle", "stats-update")
 		w.Header().Set("Content-Type", "text/html")
 
@@ -147,8 +105,17 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 }
 
 func ServeGameStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Only GET requests are allowed", http.StatusMethodNotAllowed)
+	}
+
+	if game.PreparedStatsCache == nil {
+		http.Error(w, "No stats available", http.StatusNotFound)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html")
-	executeTemplate(w, "templates/stats-panel.html", "stats-panel", PreparedStatsCache)
+	executeTemplate(w, "templates/stats-panel.html", "stats-panel", game.PreparedStatsCache)
 }
 
 func HandleGameState(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +145,6 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	populatePreparedStatsCache(g)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonResponse)
 }

@@ -1,11 +1,11 @@
 {{define "stats-panel"}}
-<p><strong>Location:</strong></p>
-<p>{{.Location}}</p>
+<h3><strong>{{.Location}}</strong></h3>
+<p>previous location: {{.PreviousLocation}}</p>
 
-<p><strong>Inventory:</strong></p>
-<ul>
-{{range .Inventory}}
-    <li>{{.}}</li>
-{{end}}
-</ul>
+<p><strong>inventory:</strong> {{.Inventory}}</p>
+
+<p><strong>enemies in area:</strong> {{.Enemies}}</p>
+
+<p><strong>interactive items in location:</strong> {{.InteractiveItems}}</p>
+
 {{end}}
