@@ -25,12 +25,12 @@ type GameStateDetails struct {
 }
 
 type GameStateUpdateResponse struct {
-	UpdatedLocationName          string   `json:"current_location"`
-	UpdatedAdjacentLocations     []string `json:"adjacent_locations"`
+	CurrentLocation              string   `json:"current_location"`
+	AdjacentLocations            []string `json:"adjacent_locations"`
 	PlayerInventory              []string `json:"player_inventory"`
 	InteractiveObjectsInLocation []string `json:"interactive"`
 	EnemiesInLocation            []string `json:"enemies"`
-	StoryThreads                 []string `json:"new_story_threads"`
+	StoryThread                  string   `json:"story_thread"`
 }
 
 type PreparedStats struct {
@@ -84,13 +84,13 @@ func (g *Game) UpdateGameState(stateUpdate GameStateUpdateResponse) {
 		g.Player.Inventory = stateUpdate.PlayerInventory
 	}
 
-	if stateUpdate.StoryThreads != nil {
-		g.StoryThreads = append(g.StoryThreads, stateUpdate.StoryThreads...)
+	if stateUpdate.StoryThread != "" {
+		g.StoryThreads = append(g.StoryThreads, stateUpdate.StoryThread)
 	}
 }
 
 func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
-	updatedLocationName := stateUpdate.UpdatedLocationName
+	updatedLocationName := stateUpdate.CurrentLocation
 	log.Printf("Updating location: %s", updatedLocationName)
 
 	g.World.SafeAddLocation(updatedLocationName)
@@ -111,9 +111,9 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
 	log.Println("Updating enemies in location: ", stateUpdate.EnemiesInLocation)
 	g.World.CurrentLocation.Enemies = stateUpdate.EnemiesInLocation
 
-	log.Println("Updating adjacent locations: ", stateUpdate.UpdatedAdjacentLocations)
-	if len(stateUpdate.UpdatedAdjacentLocations) > 0 {
-		for _, newLocation := range stateUpdate.UpdatedAdjacentLocations {
+	log.Println("Updating adjacent locations: ", stateUpdate.AdjacentLocations)
+	if len(stateUpdate.AdjacentLocations) > 0 {
+		for _, newLocation := range stateUpdate.AdjacentLocations {
 			g.World.CurrentLocation.SafeAddAdjacentLocation(newLocation)
 		}
 	}

@@ -1,11 +1,24 @@
 {{define "stats-panel"}}
 <h3><strong>{{.Location}}</strong></h3>
+
 <p>previous location: {{.PreviousLocation}}</p>
 
-<p><strong>inventory:</strong> {{.Inventory}}</p>
+<p><strong>Inventory:</strong></p>
+{{if .Inventory}}
+    {{range .Inventory}}
+        <p>- {{.}}</p>
+    {{end}}
+{{else}}
+    <p>You aren't carrying anything.</p>
+{{end}}
 
-<p><strong>enemies in area:</strong> {{.Enemies}}</p>
-
-<p><strong>interactive items in location:</strong> {{.InteractiveItems}}</p>
+<p><strong>Enemies:</strong></p>
+{{if .Enemies}}
+    {{range .Enemies}}
+        <p>- {{.}}</p>
+    {{end}}
+{{else}}
+    <p>You are safe for now!</p>
+{{end}}
 
 {{end}}

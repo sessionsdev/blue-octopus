@@ -2,7 +2,6 @@ package game
 
 import (
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -28,15 +27,16 @@ Your task is to narrate the game world and respond to player actions.  You can i
 var GAME_MASTER_STATE_PROMPT = `
 [Current Game State]
 {
-  main_quest: %s,
-  current_location: %s,
-  previous_location: %s,
-  adjacent_locations: [%s],
-  players_inventory: [%s],
-  enemies": [%s],
-  interactive_objects: [%s],
-  story_threads: [%s]
+  "main_quest": %s,
+  "current_location": %s,
+  "previous_location": %s,
+  "adjacent_locations": [%s],
+  "player_inventory": [%s],
+  "enemies": [%s],
+  "interactive_objects": [%s],
+  "story_threads": [%s]
 }
+
 `
 
 func BuildGameStatePrompt(g *Game) string {
@@ -56,8 +56,6 @@ func BuildGameStatePrompt(g *Game) string {
 		strings.Join(currentLocation.Enemies, ", "),
 		strings.Join(currentLocation.InteractiveItems, ", "),
 		getFormattedList(g.StoryThreads))
-
-	log.Println("GAME_STATE_PROMPT: ", prompt)
 	return prompt
 }
 
@@ -70,38 +68,56 @@ func getFormattedList(list []string) string {
 }
 
 var STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT = `
-Your task is to update the game state based on a narrative context and current state of the game.
+Your task is to reconcile the state of a game world based on the narrative and player actions. You will be given the current state of the game and the most recent chat completions.
 
-**JSON Response Structure:**
+**Guidelines:**
+- Update "current_location" and "previous_location" to reflect the player's movement.
+- "adjacent_locations" should include any new areas mentioned or discovered.
+- Update "player_inventory" based on player interactions with items.
+- Modify "interactive_objects" and "enemies" to reflect changes in the environment or after encounters.
+- Provide short and concise sentence summarizing the player action and responses to help maintain a consistent narrative.
+- Respond with a structured JSON object, ensuring accuracy and completeness.
 
-State updates will always apply to the current location in the response.
-
-Respond with a JSON object containing the following fields:
+[EXPECTED JSON RESPONSE STRUCTURE]
 
 {
-  "current_location": "Location Name",
-  "adjacent_locations": ["existing", "and", "added", "adjacent", "locations"],
-  "player_inventory": ["complete", "list", "of", "player", "inventory"],
-  "interactive_objects": ["complete", "list", "of", "interactive", "objects"],
-  "enemies": ["complete", "list", "of", "enemies"],
-  "new_story_threads": ["new", "story", "threads", "to", "append"]
+  "current_location": "string",
+  "previous_location": "string",
+  "adjacent_locations": ["string"],
+  "player_inventory": ["string"],
+  "interactive_objects": ["string"],
+  "enemies": ["string"],
+  "new_story_threads": "string"
 }
 
-**Examples:**
+[CURRENT GAME STATE EXAMPLE]
 
-*Initial Provided State:*
 {
-  "main_quest": "Find the lost treasure",
-  "current_location": "Mountain Pass",
-  "previous_location": "Village",
-  "adjacent_locations": ["Forest", "Cave"],
-  "player_inventory": ["sword", "shield", "potion"],
-  "enemies": ["goblin", "skeleton", "dragon"],
-  "interactive_objects": ["chest", "door", "key"],
-  "story_threads": ["meet the blacksmith", "explore the forest"]
+  "main_quest": "Find the Lost Treasure of the Ancients",
+  "current_location": "Castle Courtyard",
+  "previous_location": "Castle Gate",
+  "adjacent_locations": ["Castle Gate", "Castle Hall"],
+  "player_inventory": ["Sword", "Health Potion"],
+  "enemies": ["Guardian Golem"],
+  "interactive_objects": ["Locked Chest", "Fountain"]
+  "story_threads": ["The Guardian Golem blocks your path to the Castle Hall."]
 }
 
-*Player Action:*
-Player: "Go into the cave"
-Assistant: "You find yourself in a dark cave.  The air is damp and the sound of dripping water echoes through the chamber.  You can see a faint light to the north."
 `
+
+func BuildStateManagerSystemPrompt(g *Game) string {
+	currentLocation := g.World.CurrentLocation
+	currentLocationName := currentLocation.LocationName
+	previousLocation := g.World.SafePreviousLocation()
+	previousLocationName := previousLocation.LocationName
+
+	prompt := fmt.Sprintf(
+		STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT,
+		currentLocationName,
+		previousLocationName,
+		currentLocation.AdjacentLocations,
+		g.Player.Inventory,
+		currentLocation.Enemies,
+		currentLocation.InteractiveItems)
+	return prompt
+}

@@ -2,38 +2,33 @@ package game
 
 import (
 	"testing"
-
-	utils "github.com/sessionsdev/blue-octopus/internal"
 )
 
 func TestUpdateGameState(t *testing.T) {
-	testCurrentLocation := &Location{
-		LocationName:      "Test Current Location",
+	newGameDetails := NewGameDetails{
+		StartingLocation:          "Test Current Location",
+		PlayerName:                "Test Player",
+		PlayerInventory:           []string{"item1", "item2"},
+		StartingAdjacentLocations: []string{"Test Adjacent Location"},
+		MainQuest:                 "Test Main Quest",
+		StoryThreads:              []string{"Test Story Thread 1"},
+	}
+
+	testGame := BuildNewGame(newGameDetails)
+
+	stateUpdate := GameStateUpdateResponse{
+		CurrentLocation:   "Test Current Location",
 		AdjacentLocations: []string{},
-		InteractiveItems:  []string{},
-		Enemies:           []string{},
+		PlayerInventory: []string{
+			"item1",
+			"item2",
+		},
+		InteractiveObjectsInLocation: []string{},
+		EnemiesInLocation:            []string{},
+		StoryThread:                  "Test Story Thread 2",
 	}
 
-	testGame := &Game{
-		Player: &Player{
-			Inventory: []string{},
-		},
-		World: &World{
-			Locations: map[string]*Location{
-				"test_current_location": testCurrentLocation,
-			},
-			CurrentLocation:  testCurrentLocation,
-			PreviousLocation: nil,
-			VisitedLocations: utils.EmptyStringSet(),
-		},
-		StoryThreads: []string{
-			"Test Story Thread 1",
-		},
-	}
-
-	stateUpdate := GameStateUpdateResponse{}
-
-	// Test with empty stateUpdate
+	// Test with current values stateUpdate
 	testGame.UpdateGameState(stateUpdate)
 	if testGame.World.CurrentLocation.LocationName != "Test Current Location" {
 		t.Errorf("Expected current location to be 'Test Current Location', but got %s", testGame.World.CurrentLocation.LocationName)
@@ -42,21 +37,23 @@ func TestUpdateGameState(t *testing.T) {
 	// Test with some inventory updates
 	stateUpdate.PlayerInventory = []string{"item1", "item2"}
 	testGame.UpdateGameState(stateUpdate)
+	if len(testGame.Player.Inventory) != 2 {
+		t.Errorf("Expected inventory to have 2 items, but got %d", len(testGame.Player.Inventory))
+	}
 
 	// Test with some story threads
-	stateUpdate.StoryThreads = []string{"thread2", "thread3"}
+	stateUpdate.StoryThread = "Test Story Thread 3"
 	testGame.UpdateGameState(stateUpdate)
 	if len(testGame.StoryThreads) != 3 {
 		t.Errorf("Expected story threads to have 3 items, but got %d", len(testGame.StoryThreads))
 	}
 
 	// Test with some location updates
-	stateUpdate.UpdatedLocationName = "Test New Location"
-	stateUpdate.UpdatedAdjacentLocations = []string{"Test Even Newer Location"}
+	stateUpdate.CurrentLocation = "Test New Location"
+	stateUpdate.AdjacentLocations = []string{"Test Even Newer Location"}
 	stateUpdate.PlayerInventory = []string{"item3", "item4"}
 	stateUpdate.InteractiveObjectsInLocation = []string{"object1", "object2"}
 	stateUpdate.EnemiesInLocation = []string{"enemy1", "enemy2"}
-	stateUpdate.StoryThreads = []string{"thread4", "thread5"}
+	stateUpdate.StoryThread = "Test Story Thread 4"
 	testGame.UpdateGameState(stateUpdate)
-
 }

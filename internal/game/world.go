@@ -14,22 +14,32 @@ type Location struct {
 	Enemies           []string
 }
 
-func (l *Location) SafeAddAdjacentLocation(newAdjacentLocation string) []string {
+func (l *Location) SafeAddAdjacentLocation(newAdjacentLocation string) {
+	// if the location has no adjacent locations, initialize it
 	if l.AdjacentLocations == nil {
 		l.AdjacentLocations = []string{}
 	}
 
+	// if the new adjacent location is empty, return
+	if newAdjacentLocation == "" {
+		return
+	}
+
+	// if the new adjacent location is the same as the current location, return
+	normalizedName := normalizedLocationName(newAdjacentLocation)
+	if l.getNormalizedName() == normalizedName {
+		return
+	}
+
+	// if the new adjacent location is not already in the list of adjacent locations, add it
 	currentAdjacentLocations := l.AdjacentLocations
 	if !utils.Contains(currentAdjacentLocations, newAdjacentLocation) {
 		l.AdjacentLocations = append(currentAdjacentLocations, newAdjacentLocation)
 	}
-
-	return l.AdjacentLocations
 }
 
 func (l *Location) getNormalizedName() string {
-	name := strings.ToLower(l.LocationName)
-	return strings.ReplaceAll(name, " ", "_")
+	return normalizedLocationName(l.LocationName)
 }
 
 type World struct {
@@ -75,13 +85,13 @@ func (w *World) GetLocationByName(locationName string) (*Location, bool) {
 	return location, ok
 }
 
-func (w *World) SafeAddLocation(locationName string) *Location {
+func (w *World) SafeAddLocation(locationName string) {
 	if w.Locations == nil {
 		w.Locations = make(map[string]*Location)
 	}
 
 	if locationName == "" {
-		return nil
+		return
 	}
 
 	// normalize the location name
@@ -90,7 +100,6 @@ func (w *World) SafeAddLocation(locationName string) *Location {
 
 	// check if the location already exists
 	location, ok := w.Locations[normalizedName]
-	log.Println("Location already exists: ", locationName)
 
 	// if it doesn't exist, create it
 	if !ok {
@@ -105,9 +114,6 @@ func (w *World) SafeAddLocation(locationName string) *Location {
 		log.Println("Adding location: ", locationName)
 		w.Locations[normalizedName] = location
 	}
-
-	// return the location and whether it was added
-	return location
 }
 
 func (w *World) SafePreviousLocation() *Location {
@@ -118,4 +124,8 @@ func (w *World) SafePreviousLocation() *Location {
 	}
 
 	return w.PreviousLocation
+}
+
+func normalizedLocationName(locationName string) string {
+	return strings.ReplaceAll(strings.ToLower(locationName), " ", "_")
 }
