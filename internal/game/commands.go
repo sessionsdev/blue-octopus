@@ -16,7 +16,7 @@ func ProcessGameCommand(command string, gameId string) (string, *Game, error) {
 	default:
 		g, err := LoadGameFromRedis(gameId)
 		if err != nil {
-			return "Error loading game. Try the [RESET GAME] command.", nil, err
+			return "No game found.  Started new game.  Retry previous message.", g, nil
 		}
 
 		narrativeResponse, err := g.processPlayerPrompt(command)
@@ -64,7 +64,7 @@ func (g *Game) processPlayerPrompt(command string) (string, error) {
 
 func (g *Game) ReconcileGameState(userMsg GameMessage, assistantMsg GameMessage) {
 	messages := []GameMessage{
-		{Provider: "system", Message: BuildStateManagerSystemPrompt(g)},
+		{Provider: "system", Message: STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT},
 	}
 
 	reconcileStatePrompt := `

@@ -75,7 +75,7 @@ Your task is to reconcile the state of a game world based on the narrative and p
 - "adjacent_locations" should include any new areas mentioned or discovered.
 - Update "player_inventory" based on player interactions with items.
 - Modify "interactive_objects" and "enemies" to reflect changes in the environment or after encounters.
-- Provide short and concise sentence summarizing the player action and responses to help maintain a consistent narrative.
+- Append new or updated story threads based on the narratve reponse.
 - Respond with a structured JSON object, ensuring accuracy and completeness.
 
 [EXPECTED JSON RESPONSE STRUCTURE]
@@ -87,7 +87,7 @@ Your task is to reconcile the state of a game world based on the narrative and p
   "player_inventory": ["string"],
   "interactive_objects": ["string"],
   "enemies": ["string"],
-  "new_story_threads": "string"
+  "story_threads": "string"
 }
 
 [CURRENT GAME STATE EXAMPLE]
@@ -100,24 +100,17 @@ Your task is to reconcile the state of a game world based on the narrative and p
   "player_inventory": ["Sword", "Health Potion"],
   "enemies": ["Guardian Golem"],
   "interactive_objects": ["Locked Chest", "Fountain"]
-  "story_threads": ["The Guardian Golem blocks your path to the Castle Hall."]
+  "story_threads": ["The Guardian Golem blocks your path to the Castle Hall.", "The Castle Gate is locked."]
 }
 
+[RESPONSE EXAMPLE]
+{
+	  "current_location": "Castle Hall",
+	  "previous_location": "Castle Courtyard",
+	  "adjacent_locations": ["Castle Courtyard", "Castle Tower"],
+	  "player_inventory": ["Sword", "Health Potion", "Key"],
+	  "interactive_objects": [],
+	  "enemies": [],
+	  "story_threads": ["The Guardian Golem blocks your path to the Castle Tower.", "The Castle Gate is locked.", "You find the Lost Treasure of the Ancients."]
+}
 `
-
-func BuildStateManagerSystemPrompt(g *Game) string {
-	currentLocation := g.World.CurrentLocation
-	currentLocationName := currentLocation.LocationName
-	previousLocation := g.World.SafePreviousLocation()
-	previousLocationName := previousLocation.LocationName
-
-	prompt := fmt.Sprintf(
-		STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT,
-		currentLocationName,
-		previousLocationName,
-		currentLocation.AdjacentLocations,
-		g.Player.Inventory,
-		currentLocation.Enemies,
-		currentLocation.InteractiveItems)
-	return prompt
-}

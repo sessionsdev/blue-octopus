@@ -157,7 +157,7 @@ func LoadGameFromRedis(gameId string) (*Game, error) {
 
 	encodedGame, err := redis.GetGob(gameId)
 	if err != nil {
-		log.Fatalf("Error loading game from redis: %s", gameId)
+		return InitializeNewGame(), err
 	}
 
 	return decodeGame(encodedGame), nil

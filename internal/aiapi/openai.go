@@ -168,6 +168,10 @@ func (c *OpenAIClient) DoRequest(userMessages []AiMessage) (*OpenAiChatResponse,
 		return &OpenAiChatResponse{}, fmt.Errorf("error decoding response: %w", err)
 	}
 
+	// prettyPrint(openAiResponse)
+	log.Println("CLIENT RESPONSE TYPE: ", c.ResponseFormat.Type)
+	log.Println("OpenAI Response: ", openAiResponse.Choices[0].Message.Content)
+
 	return &OpenAiChatResponse{
 		Completion: openAiResponse.GetChatCompletion(),
 		TokensUsed: openAiResponse.GetTokenUsage(),
