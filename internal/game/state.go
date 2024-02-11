@@ -30,7 +30,7 @@ type GameStateUpdateResponse struct {
 	PlayerInventory              []string `json:"player_inventory"`
 	InteractiveObjectsInLocation []string `json:"interactive"`
 	EnemiesInLocation            []string `json:"enemies"`
-	StoryThread                  string   `json:"story_thread"`
+	StoryThreads                 []string `json:"story_threads"`
 }
 
 type PreparedStats struct {
@@ -67,7 +67,7 @@ func (g *Game) BuildGameStateDetails() GameStateDetails {
 		Inventory:        g.Player.Inventory,
 		InteractiveItems: g.World.CurrentLocation.InteractiveItems,
 		Enemies:          g.World.CurrentLocation.Enemies,
-		StoryThreads:     g.StoryThreads,
+		StoryThreads:     g.World.CurrentLocation.StoryThreads,
 	}
 }
 
@@ -82,10 +82,6 @@ func (g *Game) UpdateGameState(stateUpdate GameStateUpdateResponse) {
 	if stateUpdate.PlayerInventory != nil {
 		log.Printf("Updating player inventory: %v", stateUpdate.PlayerInventory)
 		g.Player.Inventory = stateUpdate.PlayerInventory
-	}
-
-	if stateUpdate.StoryThread != "" {
-		g.StoryThreads = append(g.StoryThreads, stateUpdate.StoryThread)
 	}
 }
 
@@ -110,6 +106,9 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
 
 	log.Println("Updating enemies in location: ", stateUpdate.EnemiesInLocation)
 	g.World.CurrentLocation.Enemies = stateUpdate.EnemiesInLocation
+
+	log.Println("Updating story threads: ", stateUpdate.StoryThreads)
+	g.World.CurrentLocation.StoryThreads = stateUpdate.StoryThreads
 
 	log.Println("Updating adjacent locations: ", stateUpdate.AdjacentLocations)
 	if len(stateUpdate.AdjacentLocations) > 0 {

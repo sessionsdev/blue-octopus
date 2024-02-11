@@ -29,18 +29,14 @@ func ProcessGameCommand(command string, gameId string) (string, *Game, error) {
 }
 
 func (g *Game) processPlayerPrompt(command string) (string, error) {
-	messages := []GameMessage{}
-	messages = append(messages, GameMessage{Provider: "system", Message: GAME_MASTER_RESPONSABILITY_PROMPT})
+	messages := []GameMessage{
+		{Provider: "system", Message: GAME_MASTER_RESPONSABILITY_PROMPT},
+		{Provider: "system", Message: BuildGameMasterStatePrompt(g)},
+	}
 
-	history := g.GetRecentHistory(10)
+	history := g.GetRecentHistory(20)
 	messages = append(messages, history...)
-
-	gameState := BuildGameStatePrompt(g)
-	gameStateMsg := GameMessage{Provider: "system", Message: gameState}
-	messages = append(messages, gameStateMsg)
-
-	userMsg := GameMessage{Provider: "user", Message: command}
-	messages = append(messages, userMsg)
+	messages = append(messages, GameMessage{Provider: "user", Message: command})
 
 	// Call the OpenAI Chat API using the client
 	response, err := callClient("openai", messages)
@@ -56,8 +52,8 @@ func (g *Game) processPlayerPrompt(command string) (string, error) {
 
 	assistantMessage := GameMessage{Provider: "assistant", Message: responseMessage}
 
-	g.UpdateGameHistory(userMsg, assistantMessage)
-	go g.ReconcileGameState(userMsg, assistantMessage)
+	g.UpdateGameHistory(GameMessage{Provider: "user", Message: command}, assistantMessage)
+	go g.ReconcileGameState(GameMessage{Provider: "user", Message: command}, assistantMessage)
 
 	return responseMessage, nil
 }
@@ -65,20 +61,13 @@ func (g *Game) processPlayerPrompt(command string) (string, error) {
 func (g *Game) ReconcileGameState(userMsg GameMessage, assistantMsg GameMessage) {
 	messages := []GameMessage{
 		{Provider: "system", Message: STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT},
+		{Provider: "system", Message: BuildStateManagerPrompt(g)},
 	}
 
-	reconcileStatePrompt := `
-		%s
+	messages = append(messages, userMsg, assistantMsg)
 
-		Reconcile the game state with the following updates:
-
-		Player Action: %s
-
-		Assistant Response: %s
-	`
-
-	userMessage := fmt.Sprintf(reconcileStatePrompt, BuildGameStatePrompt(g), userMsg.Message, assistantMsg.Message)
-	messages = append(messages, GameMessage{Provider: "user", Message: userMessage})
+	reconcileStatePrompt := `Reconcile the game state with the previous messages and respond with a structured JSON object.`
+	messages = append(messages, GameMessage{Provider: "user", Message: reconcileStatePrompt})
 
 	// Call the OpenAI Chat API using the client
 	response, err := callClient("openai-json", messages)

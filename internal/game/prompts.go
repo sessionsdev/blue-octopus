@@ -25,22 +25,22 @@ Your task is to narrate the game world and respond to player actions.  You can i
 `
 
 var GAME_MASTER_STATE_PROMPT = `
-[Current Game State]
-{
-  "main_quest": %s,
-  "current_location": %s,
-  "previous_location": %s,
-  "adjacent_locations": [%s],
-  "player_inventory": [%s],
-  "enemies": [%s],
-  "interactive_objects": [%s],
-  "story_threads": [%s]
-}
+[CURRENT GAME STATE]
 
+current location: %s
+previous location: %s
+player's inventory: %s
+enemies in the current location: %s
+interactive objects in the current location: %s
+
+[STORY THREADS]
+
+The story notes, plot points, and reminders for this location:
+
+%s
 `
 
-func BuildGameStatePrompt(g *Game) string {
-	mainQuest := g.MainQuest
+func BuildGameMasterStatePrompt(g *Game) string {
 	currentLocation := g.World.CurrentLocation
 	currentLocationName := currentLocation.LocationName
 	previousLocation := g.World.SafePreviousLocation()
@@ -48,14 +48,12 @@ func BuildGameStatePrompt(g *Game) string {
 
 	prompt := fmt.Sprintf(
 		GAME_MASTER_STATE_PROMPT,
-		mainQuest,
 		currentLocationName,
 		previousLocationName,
-		strings.Join(currentLocation.AdjacentLocations, ", "),
 		strings.Join(g.Player.Inventory, ", "),
 		strings.Join(currentLocation.Enemies, ", "),
 		strings.Join(currentLocation.InteractiveItems, ", "),
-		getFormattedList(g.StoryThreads))
+		getFormattedList(g.World.CurrentLocation.StoryThreads))
 	return prompt
 }
 
@@ -67,50 +65,54 @@ func getFormattedList(list []string) string {
 	return returnString
 }
 
-var STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT = `
-Your task is to reconcile the state of a game world based on the narrative and player actions. You will be given the current state of the game and the most recent chat completions.
+var STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT = `Your task is to reconcile the state of a game world based on the narrative and player actions. 
 
-**Guidelines:**
-- Update "current_location" and "previous_location" to reflect the player's movement.
-- "adjacent_locations" should include any new areas mentioned or discovered.
+You will be given the current state of the game and the most recent chat completions.  You should respond with a structured JSON object that reflects the current state of the game world.
+
+**Response Protocol:**
+
+- Update "current_location" to reflect the player's movement.
 - Update "player_inventory" based on player interactions with items.
-- Modify "interactive_objects" and "enemies" to reflect changes in the environment or after encounters.
-- Append new or updated story threads based on the narratve reponse.
+- Modify "interactive_objects" and "enemies" to reflect changes in the environment or after encounters.  Each location has it's own list of enemies and objects.
+- Append new, or update existing, story threads based on the narratve reponse.  Each location has it's own list of story threads.
+- If the current location has changed, concisely summerize any existing story threads and carry over the breif to the new location.
 - Respond with a structured JSON object, ensuring accuracy and completeness.
 
 [EXPECTED JSON RESPONSE STRUCTURE]
 
 {
   "current_location": "string",
-  "previous_location": "string",
-  "adjacent_locations": ["string"],
   "player_inventory": ["string"],
   "interactive_objects": ["string"],
   "enemies": ["string"],
-  "story_threads": "string"
-}
-
-[CURRENT GAME STATE EXAMPLE]
-
-{
-  "main_quest": "Find the Lost Treasure of the Ancients",
-  "current_location": "Castle Courtyard",
-  "previous_location": "Castle Gate",
-  "adjacent_locations": ["Castle Gate", "Castle Hall"],
-  "player_inventory": ["Sword", "Health Potion"],
-  "enemies": ["Guardian Golem"],
-  "interactive_objects": ["Locked Chest", "Fountain"]
-  "story_threads": ["The Guardian Golem blocks your path to the Castle Hall.", "The Castle Gate is locked."]
-}
-
-[RESPONSE EXAMPLE]
-{
-	  "current_location": "Castle Hall",
-	  "previous_location": "Castle Courtyard",
-	  "adjacent_locations": ["Castle Courtyard", "Castle Tower"],
-	  "player_inventory": ["Sword", "Health Potion", "Key"],
-	  "interactive_objects": [],
-	  "enemies": [],
-	  "story_threads": ["The Guardian Golem blocks your path to the Castle Tower.", "The Castle Gate is locked.", "You find the Lost Treasure of the Ancients."]
+  "story_threads": ["string"]
 }
 `
+
+var STATE_MANAGER_CURRENT_STATE_PROMPT = `
+[CURRENT GAME STATE]
+{
+	  "current_location": "%s",
+	  "player_inventory": [%s],
+	  "interactive_objects": [%s],
+	  "enemies": [%s],
+	  "story_threads": [%s]
+}`
+
+func BuildStateManagerPrompt(g *Game) string {
+	currentLocation := g.World.CurrentLocation
+	currentLocationName := currentLocation.LocationName
+	playerInventory := strings.Join(g.Player.Inventory, ", ")
+	interactiveObjects := strings.Join(currentLocation.InteractiveItems, ", ")
+	enemies := strings.Join(currentLocation.Enemies, ", ")
+	storyThreads := strings.Join(g.World.CurrentLocation.StoryThreads, ", ")
+
+	prompt := fmt.Sprintf(
+		STATE_MANAGER_CURRENT_STATE_PROMPT,
+		currentLocationName,
+		playerInventory,
+		interactiveObjects,
+		enemies,
+		storyThreads)
+	return prompt
+}

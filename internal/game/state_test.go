@@ -11,7 +11,6 @@ func TestUpdateGameState(t *testing.T) {
 		PlayerInventory:           []string{"item1", "item2"},
 		StartingAdjacentLocations: []string{"Test Adjacent Location"},
 		MainQuest:                 "Test Main Quest",
-		StoryThreads:              []string{"Test Story Thread 1"},
 	}
 
 	testGame := BuildNewGame(newGameDetails)
@@ -25,7 +24,7 @@ func TestUpdateGameState(t *testing.T) {
 		},
 		InteractiveObjectsInLocation: []string{},
 		EnemiesInLocation:            []string{},
-		StoryThread:                  "Test Story Thread 2",
+		StoryThreads:                 []string{"Test Story Thread 2"},
 	}
 
 	// Test with current values stateUpdate
@@ -42,11 +41,8 @@ func TestUpdateGameState(t *testing.T) {
 	}
 
 	// Test with some story threads
-	stateUpdate.StoryThread = "Test Story Thread 3"
+	stateUpdate.StoryThreads = []string{"Test Story Thread 3"}
 	testGame.UpdateGameState(stateUpdate)
-	if len(testGame.StoryThreads) != 3 {
-		t.Errorf("Expected story threads to have 3 items, but got %d", len(testGame.StoryThreads))
-	}
 
 	// Test with some location updates
 	stateUpdate.CurrentLocation = "Test New Location"
@@ -54,6 +50,6 @@ func TestUpdateGameState(t *testing.T) {
 	stateUpdate.PlayerInventory = []string{"item3", "item4"}
 	stateUpdate.InteractiveObjectsInLocation = []string{"object1", "object2"}
 	stateUpdate.EnemiesInLocation = []string{"enemy1", "enemy2"}
-	stateUpdate.StoryThread = "Test Story Thread 4"
+	stateUpdate.StoryThreads = []string{"Test Story Thread 4"}
 	testGame.UpdateGameState(stateUpdate)
 }

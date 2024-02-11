@@ -11,20 +11,12 @@
         </div>
         <div id="game-state-panel" hx-get="/api/stats-display" hx-trigger="every 3s" hx-swap="innerHTML">
             <p>Welcome to Adventure AI.  A text based Adventure Game</p>
-
-            <p>
-                Interact with the game by typing commands into the input box below.  
-                For example, you can type "Go North" to move in that direction, 
-                "Take Sword" to pick up an item, or "Attack Bear" to attack an enemy.
-            </p>
-
-
         </div>
     </div> <!-- End of game-area div -->
     <form 
         hx-post="/api/process-command" 
         hx-target="#game-output" 
-        hx-swap="beforeend" 
+        hx-swap="beforeend scroll:bottom" 
         hx-on::before-request="this.reset()"
         >
         <input type="text" name="command" id="command-input" placeholder="Enter your command (Go to {LOCATION}, Take {ITEM}, Attack {ENEMY}....)" autocomplete="off">

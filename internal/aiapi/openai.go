@@ -20,7 +20,7 @@ var ModelMap = map[string]string{
 
 func init() {
 	OpenAiClient = New(ModelMap["gpt3"], 0.7, ResponseFormat{Type: "text"})
-	OpenAiJsonClient = New(ModelMap["gpt3"], 0.7, ResponseFormat{Type: "json_object"})
+	OpenAiJsonClient = New(ModelMap["gpt4"], 0.7, ResponseFormat{Type: "json_object"})
 }
 
 func New(model string, temp float64, responseFormat ResponseFormat) *OpenAIClient {

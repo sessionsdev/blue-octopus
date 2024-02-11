@@ -12,6 +12,7 @@ type Location struct {
 	AdjacentLocations []string
 	InteractiveItems  []string
 	Enemies           []string
+	StoryThreads      []string
 }
 
 func (l *Location) SafeAddAdjacentLocation(newAdjacentLocation string) {

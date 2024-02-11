@@ -13,11 +13,11 @@ type GameMessage struct {
 
 type NewGameDetails struct {
 	StartingLocation          string   `json:"starting_location"`
+	StartingStoryThreads      []string `json:"starting_story_threads"`
 	PlayerName                string   `json:"player_name"`
 	PlayerInventory           []string `json:"player_inventory"`
 	StartingAdjacentLocations []string `json:"starting_adjacent_locations"`
 	MainQuest                 string   `json:"main_quest"`
-	StoryThreads              []string `json:"story_threads"`
 }
 
 func (m *GameMessage) NewMessage(provider string, message string) Message {
@@ -29,7 +29,6 @@ type Game struct {
 	World              *World        `json:"world"`
 	Player             *Player       `json:"player"`
 	MainQuest          string        `json:"main_quest"`
-	StoryThreads       []string      `json:"story_threads"`
 	GameMessageHistory []GameMessage `json:"game_message_history"`
 	TotalTokensUsed    int           `json:"total_tokens_used"`
 }
@@ -57,7 +56,6 @@ func BuildNewGame(details NewGameDetails) *Game {
 			Inventory: details.PlayerInventory,
 		},
 		MainQuest:          details.MainQuest,
-		StoryThreads:       details.StoryThreads,
 		GameMessageHistory: []GameMessage{},
 		TotalTokensUsed:    0,
 	}
@@ -66,9 +64,12 @@ func BuildNewGame(details NewGameDetails) *Game {
 	startingLocation := &Location{
 		LocationName:      details.StartingLocation,
 		AdjacentLocations: details.StartingAdjacentLocations,
+		StoryThreads:      []string{},
 		InteractiveItems:  []string{},
 		Enemies:           []string{},
 	}
+
+	startingLocation.StoryThreads = details.StartingStoryThreads
 
 	// Add the starting location to the world
 	game.World.SafeAddLocation(startingLocation.LocationName)
