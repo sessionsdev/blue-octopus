@@ -8,17 +8,17 @@ import (
 )
 
 type Location struct {
-	LocationName      string
-	AdjacentLocations []string
-	InteractiveItems  []string
-	Enemies           []string
-	StoryThreads      []string
+	LocationName         string
+	AdjacentLocationKeys utils.StringSet
+	InteractiveItems     utils.StringSet
+	Enemies              utils.StringSet
+	StoryThreads         []string
 }
 
 func (l *Location) SafeAddAdjacentLocation(newAdjacentLocation string) {
 	// if the location has no adjacent locations, initialize it
-	if l.AdjacentLocations == nil {
-		l.AdjacentLocations = []string{}
+	if l.AdjacentLocationKeys == nil {
+		l.AdjacentLocationKeys = make(map[string]struct{})
 	}
 
 	// if the new adjacent location is empty, return
@@ -33,9 +33,9 @@ func (l *Location) SafeAddAdjacentLocation(newAdjacentLocation string) {
 	}
 
 	// if the new adjacent location is not already in the list of adjacent locations, add it
-	currentAdjacentLocations := l.AdjacentLocations
-	if !utils.Contains(currentAdjacentLocations, newAdjacentLocation) {
-		l.AdjacentLocations = append(currentAdjacentLocations, newAdjacentLocation)
+	currentAdjacentLocations := l.AdjacentLocationKeys
+	if !currentAdjacentLocations.Contains(normalizedName) {
+		l.AdjacentLocationKeys.AddAll(normalizedName)
 	}
 }
 
@@ -44,10 +44,10 @@ func (l *Location) getNormalizedName() string {
 }
 
 type World struct {
-	Locations        map[string]*Location
-	CurrentLocation  *Location
-	PreviousLocation *Location
-	VisitedLocations utils.StringSet
+	Locations           map[string]*Location
+	CurrentLocation     *Location
+	PreviousLocationKey string
+	VisitedLocations    utils.StringSet
 }
 
 func (w *World) NextLocation(nextLocation *Location) *Location {
@@ -68,10 +68,10 @@ func (w *World) NextLocation(nextLocation *Location) *Location {
 	w.VisitedLocations.AddAll(w.CurrentLocation.LocationName, nextLocation.LocationName)
 
 	// update previous, current locations and adjacent locations
-	w.CurrentLocation.AdjacentLocations = append(w.CurrentLocation.AdjacentLocations, nextLocation.LocationName)
-	nextLocation.AdjacentLocations = append(nextLocation.AdjacentLocations, w.CurrentLocation.LocationName)
+	w.CurrentLocation.AdjacentLocationKeys.AddAll(nextLocation.getNormalizedName())
+	nextLocation.AdjacentLocationKeys.AddAll(w.CurrentLocation.getNormalizedName())
 
-	w.PreviousLocation = w.CurrentLocation
+	w.PreviousLocationKey = w.CurrentLocation.getNormalizedName()
 	w.CurrentLocation = nextLocation
 	return w.CurrentLocation
 }
@@ -86,13 +86,13 @@ func (w *World) GetLocationByName(locationName string) (*Location, bool) {
 	return location, ok
 }
 
-func (w *World) SafeAddLocation(locationName string) {
+func (w *World) SafeAddLocation(locationName string) *Location {
 	if w.Locations == nil {
 		w.Locations = make(map[string]*Location)
 	}
 
 	if locationName == "" {
-		return
+		return nil
 	}
 
 	// normalize the location name
@@ -105,26 +105,18 @@ func (w *World) SafeAddLocation(locationName string) {
 	// if it doesn't exist, create it
 	if !ok {
 		location = &Location{
-			LocationName:      locationName,
-			AdjacentLocations: []string{},
-			InteractiveItems:  []string{},
-			Enemies:           []string{},
+			LocationName:         locationName,
+			AdjacentLocationKeys: utils.EmptyStringSet(),
+			InteractiveItems:     utils.EmptyStringSet(),
+			Enemies:              utils.EmptyStringSet(),
 		}
 
 		// add the location to the world
 		log.Println("Adding location: ", locationName)
 		w.Locations[normalizedName] = location
 	}
-}
 
-func (w *World) SafePreviousLocation() *Location {
-	if w.PreviousLocation == nil {
-		return &Location{
-			LocationName: "Unknown",
-		}
-	}
-
-	return w.PreviousLocation
+	return location
 }
 
 func normalizedLocationName(locationName string) string {

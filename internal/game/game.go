@@ -46,10 +46,10 @@ func (g *Game) GetRecentHistory(numItems int) []GameMessage {
 func BuildNewGame(details NewGameDetails) *Game {
 	game := &Game{
 		World: &World{
-			Locations:        make(map[string]*Location),
-			CurrentLocation:  nil,
-			PreviousLocation: nil,
-			VisitedLocations: utils.EmptyStringSet(),
+			Locations:           make(map[string]*Location),
+			CurrentLocation:     nil,
+			PreviousLocationKey: "",
+			VisitedLocations:    utils.EmptyStringSet(),
 		},
 		Player: &Player{
 			Name:      details.PlayerName,
@@ -60,20 +60,18 @@ func BuildNewGame(details NewGameDetails) *Game {
 		TotalTokensUsed:    0,
 	}
 
-	// Create the starting location
-	startingLocation := &Location{
-		LocationName:      details.StartingLocation,
-		AdjacentLocations: details.StartingAdjacentLocations,
-		StoryThreads:      []string{},
-		InteractiveItems:  []string{},
-		Enemies:           []string{},
-	}
-
-	startingLocation.StoryThreads = details.StartingStoryThreads
-
 	// Add the starting location to the world
-	game.World.SafeAddLocation(startingLocation.LocationName)
-	game.World.CurrentLocation = startingLocation
+	game.World.SafeAddLocation(details.StartingLocation)
+	game.World.CurrentLocation, _ = game.World.GetLocationByName(details.StartingLocation)
+	game.World.CurrentLocation.StoryThreads = details.StartingStoryThreads
+	game.World.CurrentLocation.AdjacentLocationKeys = utils.EmptyStringSet()
+
+	for _, locationName := range details.StartingAdjacentLocations {
+		game.World.SafeAddLocation(locationName)
+		location, _ := game.World.GetLocationByName(locationName)
+		location.AdjacentLocationKeys.AddAll(game.World.CurrentLocation.LocationName)
+		game.World.CurrentLocation.AdjacentLocationKeys.AddAll(location.LocationName)
+	}
 
 	return game
 }

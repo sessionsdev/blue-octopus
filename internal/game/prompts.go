@@ -29,9 +29,10 @@ var GAME_MASTER_STATE_PROMPT = `
 
 current location: %s
 previous location: %s
-player's inventory: %s
-enemies in the current location: %s
-interactive objects in the current location: %s
+other adjacent locations: [%s]
+player's inventory: [%s]
+enemies in the current location: [%s]
+interactive objects in the current location: [%s]
 
 [STORY THREADS]
 
@@ -43,16 +44,33 @@ The story notes, plot points, and reminders for this location:
 func BuildGameMasterStatePrompt(g *Game) string {
 	currentLocation := g.World.CurrentLocation
 	currentLocationName := currentLocation.LocationName
-	previousLocation := g.World.SafePreviousLocation()
-	previousLocationName := previousLocation.LocationName
+	previousLocationKey := g.World.PreviousLocationKey
+	previousLocation, ok := g.World.GetLocationByName(previousLocationKey)
+	var previousLocationName string
+	if !ok {
+		previousLocationName = "Unknown"
+	} else {
+		previousLocationName = previousLocation.LocationName
+	}
+
+	// get the adjacent location names
+	var adjacentLocations []string
+	for key := range currentLocation.AdjacentLocationKeys {
+		adjacentLocation, ok := g.World.GetLocationByName(key)
+		if !ok {
+			continue
+		}
+		adjacentLocations = append(adjacentLocations, adjacentLocation.LocationName)
+	}
 
 	prompt := fmt.Sprintf(
 		GAME_MASTER_STATE_PROMPT,
 		currentLocationName,
 		previousLocationName,
+		strings.Join(adjacentLocations, ", "),
 		strings.Join(g.Player.Inventory, ", "),
-		strings.Join(currentLocation.Enemies, ", "),
-		strings.Join(currentLocation.InteractiveItems, ", "),
+		strings.Join(currentLocation.Enemies.ToSlice(), ", "),
+		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "),
 		getFormattedList(g.World.CurrentLocation.StoryThreads))
 	return prompt
 }
@@ -72,6 +90,7 @@ You will be given the current state of the game and the most recent chat complet
 **Response Protocol:**
 
 - Update "current_location" to reflect the player's movement.
+- Update "adjacent_locations" to reflect the current location's connections to other locations as described in the narrative.
 - Update "player_inventory" based on player interactions with items.
 - Modify "interactive_objects" and "enemies" to reflect changes in the environment or after encounters.  Each location has it's own list of enemies and objects.
 - Append new, or update existing, story threads based on the narratve reponse.  Each location has it's own list of story threads.
@@ -82,6 +101,7 @@ You will be given the current state of the game and the most recent chat complet
 
 {
   "current_location": "string",
+  "adjacent_locations": ["string"],
   "player_inventory": ["string"],
   "interactive_objects": ["string"],
   "enemies": ["string"],
@@ -92,7 +112,8 @@ You will be given the current state of the game and the most recent chat complet
 var STATE_MANAGER_CURRENT_STATE_PROMPT = `
 [CURRENT GAME STATE]
 {
-	  "current_location": "%s",
+	  "current_location": %s,
+	  "adjacent_locations": [%s],
 	  "player_inventory": [%s],
 	  "interactive_objects": [%s],
 	  "enemies": [%s],
@@ -102,17 +123,25 @@ var STATE_MANAGER_CURRENT_STATE_PROMPT = `
 func BuildStateManagerPrompt(g *Game) string {
 	currentLocation := g.World.CurrentLocation
 	currentLocationName := currentLocation.LocationName
-	playerInventory := strings.Join(g.Player.Inventory, ", ")
-	interactiveObjects := strings.Join(currentLocation.InteractiveItems, ", ")
-	enemies := strings.Join(currentLocation.Enemies, ", ")
-	storyThreads := strings.Join(g.World.CurrentLocation.StoryThreads, ", ")
+
+	// get the adjacent location names
+	var adjacentLocations []string
+	for key := range currentLocation.AdjacentLocationKeys {
+		adjacentLocation, ok := g.World.GetLocationByName(key)
+		if !ok {
+			continue
+		}
+
+		adjacentLocations = append(adjacentLocations, adjacentLocation.LocationName)
+	}
 
 	prompt := fmt.Sprintf(
 		STATE_MANAGER_CURRENT_STATE_PROMPT,
 		currentLocationName,
-		playerInventory,
-		interactiveObjects,
-		enemies,
-		storyThreads)
+		strings.Join(adjacentLocations, ", "),
+		strings.Join(g.Player.Inventory, ", "),
+		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "),
+		strings.Join(currentLocation.Enemies.ToSlice(), ", "),
+		strings.Join(currentLocation.StoryThreads, ", "))
 	return prompt
 }

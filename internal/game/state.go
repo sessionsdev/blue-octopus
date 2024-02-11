@@ -53,20 +53,24 @@ func (g *Game) populatePreparedStatsCache() {
 		PreparedStatsCache.Location = "Unknown Location"
 	}
 
-	previousLocationName := g.World.SafePreviousLocation().LocationName
-	PreparedStatsCache.PreviousLocation = previousLocationName
+	previousLocation, _ := g.World.GetLocationByName(g.World.PreviousLocationKey)
+	if previousLocation != nil {
+		PreparedStatsCache.PreviousLocation = previousLocation.LocationName
+	} else {
+		PreparedStatsCache.PreviousLocation = "Unknown Location"
+	}
 
 	PreparedStatsCache.Inventory = g.Player.Inventory
-	PreparedStatsCache.Enemies = g.World.CurrentLocation.Enemies
-	PreparedStatsCache.InteractiveItems = g.World.CurrentLocation.InteractiveItems
+	PreparedStatsCache.Enemies = g.World.CurrentLocation.Enemies.ToSlice()
+	PreparedStatsCache.InteractiveItems = g.World.CurrentLocation.InteractiveItems.ToSlice()
 }
 
 func (g *Game) BuildGameStateDetails() GameStateDetails {
 	return GameStateDetails{
 		CurrentLocation:  g.World.CurrentLocation.LocationName,
 		Inventory:        g.Player.Inventory,
-		InteractiveItems: g.World.CurrentLocation.InteractiveItems,
-		Enemies:          g.World.CurrentLocation.Enemies,
+		InteractiveItems: g.World.CurrentLocation.InteractiveItems.ToSlice(),
+		Enemies:          g.World.CurrentLocation.Enemies.ToSlice(),
 		StoryThreads:     g.World.CurrentLocation.StoryThreads,
 	}
 }
@@ -102,10 +106,10 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
 	}
 
 	log.Println("Updating interactive objects in location: ", stateUpdate.InteractiveObjectsInLocation)
-	g.World.CurrentLocation.InteractiveItems = stateUpdate.InteractiveObjectsInLocation
+	g.World.CurrentLocation.InteractiveItems.AddAll(stateUpdate.InteractiveObjectsInLocation...)
 
 	log.Println("Updating enemies in location: ", stateUpdate.EnemiesInLocation)
-	g.World.CurrentLocation.Enemies = stateUpdate.EnemiesInLocation
+	g.World.CurrentLocation.Enemies.AddAll(stateUpdate.EnemiesInLocation...)
 
 	log.Println("Updating story threads: ", stateUpdate.StoryThreads)
 	g.World.CurrentLocation.StoryThreads = stateUpdate.StoryThreads
