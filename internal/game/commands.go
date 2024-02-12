@@ -64,7 +64,7 @@ func (g *Game) ReconcileGameState(userMsg GameMessage, assistantMsg GameMessage)
 		{Provider: "system", Message: BuildStateManagerPrompt(g)},
 	}
 
-	messages = append(messages, userMsg, assistantMsg)
+	messages = append(messages, g.GetRecentHistory(5)...)
 
 	reconcileStatePrompt := `Reconcile the game state with the previous messages and respond with a structured JSON object.`
 	messages = append(messages, GameMessage{Provider: "user", Message: reconcileStatePrompt})

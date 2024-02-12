@@ -8,14 +8,10 @@ import (
 
 func InitializeNewGame() *Game {
 	newGameDetails := NewGameDetails{
-		StartingLocation: "Blue House",
-		PlayerName:       "Adventurer",
-		StartingStoryThreads: []string{"The player awoke at the blue house with no memory.",
-			"The player must find a way to enter the locked blue house.",
-			"The five trophies are scattered throughout the world."},
+		StartingLocation:          "Blue House",
+		PlayerName:                "Adventurer",
 		PlayerInventory:           []string{},
 		StartingAdjacentLocations: []string{"River", "Eastern Road"},
-		MainQuest:                 "Acquire the five trophies and place them in the trophy case inside the blue house.",
 	}
 
 	newGame := BuildNewGame(newGameDetails)

@@ -10,6 +10,15 @@ You are the Game Master in a text based role playing adventure.  Inspired by tex
 
 Your task is to narrate the game world and respond to player actions.  You can invent new puzzles, stories, new locations, items, enemies and characters to interact with using the current game state, story threads and conversation history as a guide.
 
+**State Property Definitions:**
+- "player_location" - The current location of the player.
+- "previous_location" - The previous location of the player.
+- "connected_locations" - A list of other locations connected to the current location.
+- "player_inventory" - A list of items the player is carrying.
+- "enemies_in_location" - A list of enemies in the current location.
+- "interactive_objects_in_location" - A list of interactive objects in the current location.
+
+
 **Response Protocol:**
 
 - Responses should be brief and to the point.
@@ -27,18 +36,12 @@ Your task is to narrate the game world and respond to player actions.  You can i
 var GAME_MASTER_STATE_PROMPT = `
 [CURRENT GAME STATE]
 
-current location: %s
-previous location: %s
-other adjacent locations: [%s]
-player's inventory: [%s]
-enemies in the current location: [%s]
-interactive objects in the current location: [%s]
-
-[STORY THREADS]
-
-The story notes, plot points, and reminders for this location:
-
-%s
+player_location: %s
+previous_location: %s
+connected_locations: [%s]
+player_inventory: [%s]
+enemies_in_location: [%s]
+interactive_objects_in_location: [%s]
 `
 
 func BuildGameMasterStatePrompt(g *Game) string {
@@ -68,10 +71,9 @@ func BuildGameMasterStatePrompt(g *Game) string {
 		currentLocationName,
 		previousLocationName,
 		strings.Join(adjacentLocations, ", "),
-		strings.Join(g.Player.Inventory, ", "),
+		strings.Join(g.Player.Inventory.ToSlice(), ", "),
 		strings.Join(currentLocation.Enemies.ToSlice(), ", "),
-		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "),
-		getFormattedList(g.World.CurrentLocation.StoryThreads))
+		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "))
 	return prompt
 }
 
@@ -83,41 +85,46 @@ func getFormattedList(list []string) string {
 	return returnString
 }
 
-var STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT = `Your task is to reconcile the state of a game world based on the narrative and player actions. 
+var STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT = `
+You are the game state manager for a text based role playing adventure inspired by interactive fiction games like Zork, Colossal Cave Adventure, and the Choose Your Own Adventure series.
 
-You will be given the current state of the game and the most recent chat completions.  You should respond with a structured JSON object that reflects the current state of the game world.
+You will be given the current state of the game and the most recent narrative update.  Your task is to analyze the current game state and returned a structure json object reflecting changes based on the narrative update.
 
 **Response Protocol:**
 
-- Update "current_location" to reflect the player's movement.
-- Update "adjacent_locations" to reflect the current location's connections to other locations as described in the narrative.
-- Update "player_inventory" based on player interactions with items.
-- Modify "interactive_objects" and "enemies" to reflect changes in the environment or after encounters.  Each location has it's own list of enemies and objects.
-- Append new, or update existing, story threads based on the narratve reponse.  Each location has it's own list of story threads.
-- If the current location has changed, concisely summerize any existing story threads and carry over the breif to the new location.
+- If the player changes location, update the "player_location" with a sensible location name from the narrative.  
+- If the player has not changed location, return the current value for "player_location".
+- Update "potential_locations" with any locations listed in the narrative not already in the "known_locations" list.
+- Update "player_inventory_added" if the player takes, picks up, receives, or otherwise gains an item."
+- Update "player_inventory_removed" if the player drops, uses, or otherwise loses an item."
+- Update "interactive_objects_identified" if the player discovers a new object in the location."
+- Update "interactive_objects_removed" if the player uses, destroys, or otherwise removes an object from the location."
+- Update "enemies_identified" if the player discovers a new enemy in the location."
+- Update "enemies_removed" if the player defeats, avoids, or otherwise removes an enemy from the location."
 - Respond with a structured JSON object, ensuring accuracy and completeness.
 
 [EXPECTED JSON RESPONSE STRUCTURE]
 
 {
-  "current_location": "string",
-  "adjacent_locations": ["string"],
-  "player_inventory": ["string"],
-  "interactive_objects": ["string"],
-  "enemies": ["string"],
-  "story_threads": ["string"]
+	"player_location": "string",
+	"potential_locations": ["string", "string", "string"],
+	"interactive_objects_identified": ["string", "string", "string"],
+	"interactive_objects_removed": ["string", "string", "string"],
+	"enemies_identified": ["string", "string", "string"],
+	"enemies_removed": ["string", "string", "string"],
+	"player_inventory_added": ["string", "string", "string"],
+	"player_inventory_removed": ["string", "string", "string"]
 }
 `
 
 var STATE_MANAGER_CURRENT_STATE_PROMPT = `
 [CURRENT GAME STATE]
 {
-	  "current_location": %s,
-	  "adjacent_locations": [%s],
-	  "player_inventory": [%s],
-	  "interactive_objects": [%s],
-	  "enemies": [%s],
-	  "story_threads": [%s]
+	"player_location": "%s",
+	"known_locations": [%s],
+	"player_inventory": [%s],
+	"interactive_objects_in_location": [%s],
+	"enemies_in_location": [%s],
 }`
 
 func BuildStateManagerPrompt(g *Game) string {
@@ -139,9 +146,8 @@ func BuildStateManagerPrompt(g *Game) string {
 		STATE_MANAGER_CURRENT_STATE_PROMPT,
 		currentLocationName,
 		strings.Join(adjacentLocations, ", "),
-		strings.Join(g.Player.Inventory, ", "),
+		strings.Join(g.Player.Inventory.ToSlice(), ", "),
 		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "),
-		strings.Join(currentLocation.Enemies.ToSlice(), ", "),
-		strings.Join(currentLocation.StoryThreads, ", "))
+		strings.Join(currentLocation.Enemies.ToSlice(), ", "))
 	return prompt
 }

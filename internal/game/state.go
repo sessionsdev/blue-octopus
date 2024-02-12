@@ -15,22 +15,16 @@ func init() {
 	gob.Register(utils.StringSet{})
 }
 
-type GameStateDetails struct {
-	CurrentLocation   string   `json:"current_location"`
-	AdjacentLocations []string `json:"adjacent_locations"`
-	Inventory         []string `json:"player_inventory"`
-	InteractiveItems  []string `json:"interactive_objects"`
-	Enemies           []string `json:"enemies"`
-	StoryThreads      []string `json:"current_story_threads"`
-}
-
 type GameStateUpdateResponse struct {
-	CurrentLocation              string   `json:"current_location"`
-	AdjacentLocations            []string `json:"adjacent_locations"`
-	PlayerInventory              []string `json:"player_inventory"`
-	InteractiveObjectsInLocation []string `json:"interactive"`
-	EnemiesInLocation            []string `json:"enemies"`
-	StoryThreads                 []string `json:"story_threads"`
+	PlayerLocation              string   `json:"player_location"`
+	PotentialLocations          []string `json:"potential_locations"`
+	InteactiveObjectsIdentified []string `json:"interactive_objects_identified"`
+	InteractiveObjectsRemoved   []string `json:"interactive_objects_removed"`
+	EnemiesIdentified           []string `json:"enemies_identified"`
+	EnemiesRemoved              []string `json:"enemies_removed"`
+	PlayerInventoryAdded        []string `json:"player_inventory_added"`
+	PlayerInventoryRemoved      []string `json:"player_inventory_removed"`
+	StoryThreads                []string `json:"current_story_threads"`
 }
 
 type PreparedStats struct {
@@ -60,19 +54,9 @@ func (g *Game) populatePreparedStatsCache() {
 		PreparedStatsCache.PreviousLocation = "Unknown Location"
 	}
 
-	PreparedStatsCache.Inventory = g.Player.Inventory
+	PreparedStatsCache.Inventory = g.Player.Inventory.ToSlice()
 	PreparedStatsCache.Enemies = g.World.CurrentLocation.Enemies.ToSlice()
 	PreparedStatsCache.InteractiveItems = g.World.CurrentLocation.InteractiveItems.ToSlice()
-}
-
-func (g *Game) BuildGameStateDetails() GameStateDetails {
-	return GameStateDetails{
-		CurrentLocation:  g.World.CurrentLocation.LocationName,
-		Inventory:        g.Player.Inventory,
-		InteractiveItems: g.World.CurrentLocation.InteractiveItems.ToSlice(),
-		Enemies:          g.World.CurrentLocation.Enemies.ToSlice(),
-		StoryThreads:     g.World.CurrentLocation.StoryThreads,
-	}
 }
 
 func (g *Game) UpdateGameHistory(userMessage GameMessage, assistantMessage GameMessage) {
@@ -83,34 +67,42 @@ func (g *Game) UpdateGameHistory(userMessage GameMessage, assistantMessage GameM
 func (g *Game) UpdateGameState(stateUpdate GameStateUpdateResponse) {
 	g.handleLocationUpdate(stateUpdate)
 
-	if stateUpdate.PlayerInventory != nil {
-		log.Printf("Updating player inventory: %v", stateUpdate.PlayerInventory)
-		g.Player.Inventory = stateUpdate.PlayerInventory
+	if len(stateUpdate.PlayerInventoryAdded) > 0 {
+		g.Player.Inventory.AddAll(stateUpdate.PlayerInventoryAdded...)
+	}
+
+	if len(stateUpdate.PlayerInventoryRemoved) > 0 {
+		g.Player.Inventory.RemoveAll(stateUpdate.PlayerInventoryRemoved...)
 	}
 }
 
 func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
-	updatedLocationName := stateUpdate.CurrentLocation
+	potentialLocationName := stateUpdate.PlayerLocation
+	newOrExistingLocation := g.World.SafeAddLocation(potentialLocationName)
+	currentLocation := g.World.NextLocation(newOrExistingLocation)
 
-	g.World.SafeAddLocation(updatedLocationName)
-	location, _ := g.World.GetLocationByName(updatedLocationName)
-	if location == nil {
-		return
-	}
-
-	if location.getNormalizedName() != g.World.CurrentLocation.getNormalizedName() {
-		location := g.World.NextLocation(location)
-		log.Println("Moving to new location: ", location.LocationName)
-	}
-
-	g.World.CurrentLocation.InteractiveItems.AddAll(stateUpdate.InteractiveObjectsInLocation...)
-	g.World.CurrentLocation.Enemies.AddAll(stateUpdate.EnemiesInLocation...)
-	g.World.CurrentLocation.StoryThreads = stateUpdate.StoryThreads
-
-	if len(stateUpdate.AdjacentLocations) > 0 {
-		for _, newLocation := range stateUpdate.AdjacentLocations {
-			g.World.CurrentLocation.SafeAddAdjacentLocation(newLocation)
+	if len(stateUpdate.PotentialLocations) > 0 {
+		for _, adjacentLocation := range stateUpdate.PotentialLocations {
+			adjacentLocation := g.World.SafeAddLocation(adjacentLocation)
+			currentLocation.SafeAddAdjacentLocation(adjacentLocation)
 		}
+
+	}
+
+	if len(stateUpdate.InteactiveObjectsIdentified) > 0 {
+		currentLocation.InteractiveItems.AddAll(stateUpdate.InteactiveObjectsIdentified...)
+	}
+
+	if len(stateUpdate.InteractiveObjectsRemoved) > 0 {
+		currentLocation.InteractiveItems.RemoveAll(stateUpdate.InteractiveObjectsRemoved...)
+	}
+
+	if len(stateUpdate.EnemiesIdentified) > 0 {
+		currentLocation.Enemies.AddAll(stateUpdate.EnemiesIdentified...)
+	}
+
+	if len(stateUpdate.EnemiesRemoved) > 0 {
+		currentLocation.Enemies.RemoveAll(stateUpdate.EnemiesRemoved...)
 	}
 
 }

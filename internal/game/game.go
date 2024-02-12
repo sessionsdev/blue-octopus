@@ -17,7 +17,6 @@ type NewGameDetails struct {
 	PlayerName                string   `json:"player_name"`
 	PlayerInventory           []string `json:"player_inventory"`
 	StartingAdjacentLocations []string `json:"starting_adjacent_locations"`
-	MainQuest                 string   `json:"main_quest"`
 }
 
 func (m *GameMessage) NewMessage(provider string, message string) Message {
@@ -49,13 +48,11 @@ func BuildNewGame(details NewGameDetails) *Game {
 			Locations:           make(map[string]*Location),
 			CurrentLocation:     nil,
 			PreviousLocationKey: "",
-			VisitedLocations:    utils.EmptyStringSet(),
 		},
 		Player: &Player{
 			Name:      details.PlayerName,
-			Inventory: details.PlayerInventory,
+			Inventory: utils.NewStringSet(details.PlayerInventory...),
 		},
-		MainQuest:          details.MainQuest,
 		GameMessageHistory: []GameMessage{},
 		TotalTokensUsed:    0,
 	}
@@ -63,14 +60,13 @@ func BuildNewGame(details NewGameDetails) *Game {
 	// Add the starting location to the world
 	game.World.SafeAddLocation(details.StartingLocation)
 	game.World.CurrentLocation, _ = game.World.GetLocationByName(details.StartingLocation)
-	game.World.CurrentLocation.StoryThreads = details.StartingStoryThreads
 	game.World.CurrentLocation.AdjacentLocationKeys = utils.EmptyStringSet()
 
 	for _, locationName := range details.StartingAdjacentLocations {
 		game.World.SafeAddLocation(locationName)
 		location, _ := game.World.GetLocationByName(locationName)
-		location.AdjacentLocationKeys.AddAll(game.World.CurrentLocation.LocationName)
-		game.World.CurrentLocation.AdjacentLocationKeys.AddAll(location.LocationName)
+		location.AdjacentLocationKeys.AddAll(game.World.CurrentLocation.getNormalizedName())
+		game.World.CurrentLocation.AdjacentLocationKeys.AddAll(location.getNormalizedName())
 	}
 
 	return game

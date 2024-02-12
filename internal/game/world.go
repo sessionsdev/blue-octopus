@@ -12,30 +12,27 @@ type Location struct {
 	AdjacentLocationKeys utils.StringSet
 	InteractiveItems     utils.StringSet
 	Enemies              utils.StringSet
-	StoryThreads         []string
 }
 
-func (l *Location) SafeAddAdjacentLocation(newAdjacentLocation string) {
+func (l *Location) SafeAddAdjacentLocation(adjLocation *Location) {
 	// if the location has no adjacent locations, initialize it
 	if l.AdjacentLocationKeys == nil {
 		l.AdjacentLocationKeys = make(map[string]struct{})
 	}
 
 	// if the new adjacent location is empty, return
-	if newAdjacentLocation == "" {
+	if adjLocation == nil {
 		return
 	}
 
 	// if the new adjacent location is the same as the current location, return
-	normalizedName := normalizedLocationName(newAdjacentLocation)
-	if l.getNormalizedName() == normalizedName {
+	if l.getNormalizedName() == adjLocation.getNormalizedName() {
 		return
 	}
 
 	// if the new adjacent location is not already in the list of adjacent locations, add it
-	currentAdjacentLocations := l.AdjacentLocationKeys
-	if !currentAdjacentLocations.Contains(normalizedName) {
-		l.AdjacentLocationKeys.AddAll(normalizedName)
+	if !l.AdjacentLocationKeys.Contains(adjLocation.getNormalizedName()) {
+		l.AdjacentLocationKeys.AddAll(adjLocation.getNormalizedName())
 	}
 }
 
@@ -47,7 +44,6 @@ type World struct {
 	Locations           map[string]*Location
 	CurrentLocation     *Location
 	PreviousLocationKey string
-	VisitedLocations    utils.StringSet
 }
 
 func (w *World) NextLocation(nextLocation *Location) *Location {
@@ -55,17 +51,14 @@ func (w *World) NextLocation(nextLocation *Location) *Location {
 		return w.CurrentLocation
 	}
 
-	log.Printf("Current location: %s", w.CurrentLocation.LocationName)
-	log.Printf("Next location: %s", nextLocation.LocationName)
-
-	// determine which direction we moved by looking at the current location directions and the next location name
-
-	if w.VisitedLocations == nil {
-		w.VisitedLocations = utils.EmptyStringSet()
+	if w.CurrentLocation == nil {
+		w.CurrentLocation = nextLocation
+		return w.CurrentLocation
 	}
 
-	// update visited locations
-	w.VisitedLocations.AddAll(w.CurrentLocation.LocationName, nextLocation.LocationName)
+	if w.CurrentLocation.getNormalizedName() == nextLocation.getNormalizedName() {
+		return w.CurrentLocation
+	}
 
 	// update previous, current locations and adjacent locations
 	w.CurrentLocation.AdjacentLocationKeys.AddAll(nextLocation.getNormalizedName())
