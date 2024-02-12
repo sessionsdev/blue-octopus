@@ -91,12 +91,10 @@ func (g *Game) UpdateGameState(stateUpdate GameStateUpdateResponse) {
 
 func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
 	updatedLocationName := stateUpdate.CurrentLocation
-	log.Printf("Updating location: %s", updatedLocationName)
 
 	g.World.SafeAddLocation(updatedLocationName)
 	location, _ := g.World.GetLocationByName(updatedLocationName)
 	if location == nil {
-		log.Printf("Location not found: %s", updatedLocationName)
 		return
 	}
 
@@ -105,16 +103,10 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
 		log.Println("Moving to new location: ", location.LocationName)
 	}
 
-	log.Println("Updating interactive objects in location: ", stateUpdate.InteractiveObjectsInLocation)
 	g.World.CurrentLocation.InteractiveItems.AddAll(stateUpdate.InteractiveObjectsInLocation...)
-
-	log.Println("Updating enemies in location: ", stateUpdate.EnemiesInLocation)
 	g.World.CurrentLocation.Enemies.AddAll(stateUpdate.EnemiesInLocation...)
-
-	log.Println("Updating story threads: ", stateUpdate.StoryThreads)
 	g.World.CurrentLocation.StoryThreads = stateUpdate.StoryThreads
 
-	log.Println("Updating adjacent locations: ", stateUpdate.AdjacentLocations)
 	if len(stateUpdate.AdjacentLocations) > 0 {
 		for _, newLocation := range stateUpdate.AdjacentLocations {
 			g.World.CurrentLocation.SafeAddAdjacentLocation(newLocation)
