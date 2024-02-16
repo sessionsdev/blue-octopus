@@ -29,7 +29,7 @@ func Init() {
 	// populate name to client map
 	for name, dbId := range dbnameToDbId {
 		dbClient := redis.NewClient(&redis.Options{
-			Addr:     "localhost:6379",
+			Addr:     "red-cn7earo21fec73fld5gg:6379",
 			Password: "",
 			DB:       dbId,
 		})
