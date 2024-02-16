@@ -86,7 +86,6 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		executeTemplate(w, "templates/error-update.html", "game-update", resultMsg)
 	} else {
-		game.SaveGameToRedis()
 		w.Header().Set("HX-Trigger-After-Settle", "stats-update")
 		w.Header().Set("Content-Type", "text/html")
 

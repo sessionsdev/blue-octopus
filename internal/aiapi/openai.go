@@ -115,15 +115,6 @@ type OpenAIClient struct {
 }
 
 func (c *OpenAIClient) DoRequest(userMessages []AiMessage) (*OpenAiChatResponse, error) {
-	// prettyPrint(userMessages)
-
-	log.Println("===============================")
-	for _, m := range userMessages {
-		log.Println("Provider: ", m.Provider)
-		log.Println("Message: ", m.Message)
-	}
-	log.Println("===============================")
-
 	openAiMessage := convertMessageType(userMessages)
 
 	chatRequest := ChatRequest{

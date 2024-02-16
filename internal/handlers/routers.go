@@ -8,15 +8,17 @@ import (
 func Init(staticPath string) {
 	// Initialize the handlers
 	initializeApiRoutes()
+	initializeAuthRoutes()
 	initializeWebRoutes()
 	initializeStaticRoutes(staticPath)
 }
 
 func initializeApiRoutes() {
 	http.Handle("/api/hello-world", RequestLoggerMiddleware(http.HandlerFunc(ServeHelloWorldAPI)))
-	http.Handle("/api/process-command", RequestLoggerMiddleware(http.HandlerFunc(HandleGameCommand)))
+	http.Handle("/api/process-command", AuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(HandleGameCommand))))
 	http.Handle("/api/game-state", RequestLoggerMiddleware(http.HandlerFunc(HandleGameState)))
 	http.Handle("/api/stats-display", RequestLoggerMiddleware(http.HandlerFunc(ServeGameStats)))
+	http.Handle("/api/authorize", RequestLoggerMiddleware(http.HandlerFunc(HandleAuthorization)))
 }
 
 func initializeWebRoutes() {
@@ -24,6 +26,12 @@ func initializeWebRoutes() {
 	http.Handle("/about", RequestLoggerMiddleware(http.HandlerFunc(ServeAbout)))
 	http.Handle("/game", RequestLoggerMiddleware(http.HandlerFunc(ServeGamePage)))
 	http.Handle("/test", RequestLoggerMiddleware(http.HandlerFunc(ServeTestPage)))
+}
+
+func initializeAuthRoutes() {
+	http.Handle("/login", RequestLoggerMiddleware(http.HandlerFunc(ServeLogin)))
+	// http.Handle("/logout", RequestLoggerMiddleware(http.HandlerFunc(ServeLogout)))
+
 }
 
 func initializeStaticRoutes(staticPath string) {

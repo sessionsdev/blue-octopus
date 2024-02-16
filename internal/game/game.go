@@ -28,6 +28,7 @@ type Game struct {
 	World              *World        `json:"world"`
 	Player             *Player       `json:"player"`
 	MainQuest          string        `json:"main_quest"`
+	StoryThreads       []string      `json:"story_threads"`
 	GameMessageHistory []GameMessage `json:"game_message_history"`
 	TotalTokensUsed    int           `json:"total_tokens_used"`
 }

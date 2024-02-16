@@ -8,10 +8,13 @@ import (
 	"github.com/sessionsdev/blue-octopus/internal/aiapi"
 )
 
+var gameCommandProcessing bool
+
 func ProcessGameCommand(command string, gameId string) (string, *Game, error) {
 	switch command {
 	case "RESET GAME":
 		g := InitializeNewGame()
+		g.SaveGameToRedis()
 		return fmt.Sprintf("RESET GAME: New game created with id: %s", g.GameId), g, nil
 	default:
 		g, err := LoadGameFromRedis(gameId)
@@ -29,6 +32,13 @@ func ProcessGameCommand(command string, gameId string) (string, *Game, error) {
 }
 
 func (g *Game) processPlayerPrompt(command string) (string, error) {
+	log.Println("Game command processing: ", gameCommandProcessing)
+	if gameCommandProcessing {
+		return "", fmt.Errorf("game command processing is already in progress. Please wait a moment and try again.")
+	}
+
+	gameCommandProcessing = true
+
 	messages := []GameMessage{
 		{Provider: "system", Message: GAME_MASTER_RESPONSABILITY_PROMPT},
 		{Provider: "system", Message: BuildGameMasterStatePrompt(g)},
@@ -51,14 +61,34 @@ func (g *Game) processPlayerPrompt(command string) (string, error) {
 	responseMessage := response.GetChatCompletion()
 
 	assistantMessage := GameMessage{Provider: "assistant", Message: responseMessage}
+	userMessage := GameMessage{Provider: "user", Message: command}
 
-	g.UpdateGameHistory(GameMessage{Provider: "user", Message: command}, assistantMessage)
-	go g.ReconcileGameState(GameMessage{Provider: "user", Message: command}, assistantMessage)
+	g.UpdateGameHistory(userMessage, assistantMessage)
+
+	// Reconcile the game state
+	done := make(chan bool)
+	go func() {
+		g.ReconcileGameState()
+		done <- true
+	}()
+
+	go func() {
+		g.progressStoryThreads()
+		done <- true
+	}()
+
+	go func() {
+		<-done
+		<-done
+		g.SaveGameToRedis()
+		g.populatePreparedStatsCache()
+		gameCommandProcessing = false
+	}()
 
 	return responseMessage, nil
 }
 
-func (g *Game) ReconcileGameState(userMsg GameMessage, assistantMsg GameMessage) {
+func (g *Game) ReconcileGameState() {
 	messages := []GameMessage{
 		{Provider: "system", Message: STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT},
 		{Provider: "system", Message: BuildStateManagerPrompt(g)},
@@ -81,16 +111,53 @@ func (g *Game) ReconcileGameState(userMsg GameMessage, assistantMsg GameMessage)
 
 	// marshal the response message
 	responseMessage := response.GetChatCompletion()
-	var gameResponse GameStateUpdateResponse
-	err = json.Unmarshal([]byte(responseMessage), &gameResponse)
+	var gameStateResponse GameStateUpdateResponse
+	err = json.Unmarshal([]byte(responseMessage), &gameStateResponse)
 	if err != nil {
 		log.Print("Error unmarshaling response: ", err)
 		return
 	}
 
-	g.UpdateGameState(gameResponse)
-	g.SaveGameToRedis()
-	g.populatePreparedStatsCache()
+	g.UpdateGameState(gameStateResponse)
+}
+
+type StoryThreadsResponse struct {
+	StoryThreads []string `json:"story_threads"`
+}
+
+func (g *Game) progressStoryThreads() {
+	mostRecentAssistantMessage := g.GetRecentHistory(1)[0]
+	userMsg := g.GetRecentHistory(2)[1]
+
+	var userMessage string
+	if len(g.StoryThreads) > 10 {
+		userMessage = BuildProgressiveSummaryPrompt(g.StoryThreads)
+	} else {
+		userMessage = BuildGameSummaryCurrentStatePrompt(g.StoryThreads, userMsg.Message, mostRecentAssistantMessage.Message)
+	}
+
+	messages := []GameMessage{
+		{Provider: "system", Message: GAME_SUMMARY_MANAGER_PROMPT},
+		{Provider: "user", Message: userMessage},
+	}
+
+	response, err := callClient("openai-json", messages)
+	if err != nil {
+		log.Print("Error calling OpenAI Chat API: ", err)
+		return
+	}
+
+	g.TotalTokensUsed += response.GetTokenUsage()
+
+	responseMessage := response.GetChatCompletion()
+	var storyThreadsResponse StoryThreadsResponse
+	err = json.Unmarshal([]byte(responseMessage), &storyThreadsResponse)
+	if err != nil {
+		log.Print("Error unmarshaling response: ", err)
+		return
+	}
+
+	g.StoryThreads = storyThreadsResponse.StoryThreads
 }
 
 func callClient(clientName string, messages []GameMessage) (aiapi.ChatResponse, error) {

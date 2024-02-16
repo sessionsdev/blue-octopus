@@ -112,6 +112,14 @@ func (w *World) SafeAddLocation(locationName string) *Location {
 	return location
 }
 
+func (w *World) GetAllLocationNames() []string {
+	var locationNames []string
+	for _, value := range w.Locations {
+		locationNames = append(locationNames, value.LocationName)
+	}
+	return locationNames
+}
+
 func normalizedLocationName(locationName string) string {
 	return strings.ReplaceAll(strings.ToLower(locationName), " ", "_")
 }

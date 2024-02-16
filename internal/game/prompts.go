@@ -17,6 +17,7 @@ Your task is to narrate the game world and respond to player actions.  You can i
 - "player_inventory" - A list of items the player is carrying.
 - "enemies_in_location" - A list of enemies in the current location.
 - "interactive_objects_in_location" - A list of interactive objects in the current location.
+- "story_threads" - A cronological list of running story threads, plot points, hooks, and reminders.
 
 
 **Response Protocol:**
@@ -42,6 +43,10 @@ connected_locations: [%s]
 player_inventory: [%s]
 enemies_in_location: [%s]
 interactive_objects_in_location: [%s]
+
+[STORY THREADS]
+
+%s
 `
 
 func BuildGameMasterStatePrompt(g *Game) string {
@@ -66,6 +71,9 @@ func BuildGameMasterStatePrompt(g *Game) string {
 		adjacentLocations = append(adjacentLocations, adjacentLocation.LocationName)
 	}
 
+	// get the story threads
+	var storyThreads string = getFormattedList(g.StoryThreads)
+
 	prompt := fmt.Sprintf(
 		GAME_MASTER_STATE_PROMPT,
 		currentLocationName,
@@ -73,7 +81,8 @@ func BuildGameMasterStatePrompt(g *Game) string {
 		strings.Join(adjacentLocations, ", "),
 		strings.Join(g.Player.Inventory.ToSlice(), ", "),
 		strings.Join(currentLocation.Enemies.ToSlice(), ", "),
-		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "))
+		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "),
+		storyThreads)
 	return prompt
 }
 
@@ -92,7 +101,7 @@ You will be given the current state of the game and the most recent narrative up
 
 **Response Protocol:**
 
-- If the player changes location, update the "player_location" with a sensible location name from the narrative.  
+- If the player changes location, update the "player_location" with a sensible location name from the narrative.
 - If the player has not changed location, return the current value for "player_location".
 - Update "potential_locations" with any locations listed in the narrative not already in the "known_locations" list.
 - Update "player_inventory_added" if the player takes, picks up, receives, or otherwise gains an item."
@@ -132,22 +141,75 @@ func BuildStateManagerPrompt(g *Game) string {
 	currentLocationName := currentLocation.LocationName
 
 	// get the adjacent location names
-	var adjacentLocations []string
-	for key := range currentLocation.AdjacentLocationKeys {
-		adjacentLocation, ok := g.World.GetLocationByName(key)
-		if !ok {
-			continue
-		}
+	// var adjacentLocations []string
+	// for key := range currentLocation.AdjacentLocationKeys {
+	// 	adjacentLocation, ok := g.World.GetLocationByName(key)
+	// 	if !ok {
+	// 		continue
+	// 	}
 
-		adjacentLocations = append(adjacentLocations, adjacentLocation.LocationName)
-	}
+	// 	adjacentLocations = append(adjacentLocations, adjacentLocation.LocationName)
+	// }
 
 	prompt := fmt.Sprintf(
 		STATE_MANAGER_CURRENT_STATE_PROMPT,
 		currentLocationName,
-		strings.Join(adjacentLocations, ", "),
+		strings.Join(g.World.GetAllLocationNames(), ", "),
 		strings.Join(g.Player.Inventory.ToSlice(), ", "),
 		strings.Join(currentLocation.InteractiveItems.ToSlice(), ", "),
 		strings.Join(currentLocation.Enemies.ToSlice(), ", "))
+	return prompt
+}
+
+var GAME_SUMMARY_MANAGER_PROMPT = `
+You are the game summary manager for a text based role playing adventure inspired by interactive fiction games like Zork, Colossal Cave Adventure, and the Choose Your Own Adventure series.
+
+You will be given recent narrative update of the game and a list of running story threads.  Your task is to summarize the recent changes and update existing, or append new, story threads.
+
+Story threads are plot points, hooks, reminders, and unresolved story elements.  Story threads are listed in cronological order and should be updated or appended as needed.
+
+**Response Protocol:**
+
+Respond with a json list of the complete story threads, containing any modified or appened threads.
+
+[EXPECTED JSON RESPONSE STRUCTURE]
+
+{
+	"story_threads": ["string", "string", "string"]
+}
+`
+
+var GAME_SUMMARY_CURRENT_STATE_PROMPT = `
+{
+	"current_story_threads": [%s]
+	"player_action": "%s"
+	"narrative_response": "%s"
+}
+`
+
+func BuildGameSummaryCurrentStatePrompt(storyThreads []string, userAction string, assistantResponse string) string {
+	threads := strings.Join(storyThreads, ", ")
+	prompt := fmt.Sprintf(GAME_SUMMARY_CURRENT_STATE_PROMPT, threads, userAction, assistantResponse)
+	return prompt
+}
+
+var PROGRESSIVE_SUMMARY_PROMPT = `
+Your task is to summerize the following chronological "story threads" into as breif and concise a summary as possible.  The summary should be a single sentence or short paragraph that captures the essence of the story threads so far.
+
+Respond with a json list with a single element that is the compounded summary.
+
+[EXPECTED JSON RESPONSE STRUCTURE]
+{
+	"story_threads": ["string"]
+}
+
+The story threads are as follows:
+
+%s
+`
+
+func BuildProgressiveSummaryPrompt(storyThreads []string) string {
+	threads := getFormattedList(storyThreads)
+	prompt := fmt.Sprintf(PROGRESSIVE_SUMMARY_PROMPT, threads)
 	return prompt
 }
