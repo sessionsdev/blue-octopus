@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -26,10 +27,14 @@ func (e *NotFoundError) Error() string {
 }
 
 func Init() {
+	// Get env variables
+	redisHost := os.Getenv("REDIS_HOST")
+	redisPort := os.Getenv("REDIS_PORT")
+
 	// populate name to client map
 	for name, dbId := range dbnameToDbId {
 		dbClient := redis.NewClient(&redis.Options{
-			Addr:     "red-cn7earo21fec73fld5gg:6379",
+			Addr:     redisHost + ":" + redisPort,
 			Password: "",
 			DB:       dbId,
 		})
@@ -42,6 +47,11 @@ func Init() {
 		println(pong + " DB: " + name + " is alive!")
 		dbNameToClient[name] = dbClient
 	}
+
+	// Set a value in the user db
+	adminUsername := os.Getenv("ADMIN_USERNAME")
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	SetValue("user", adminUsername, adminPassword, 9999999)
 }
 
 func SetGob(key string, value []byte, expMinutes int) error {
