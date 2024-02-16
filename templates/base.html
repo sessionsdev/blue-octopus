@@ -10,7 +10,17 @@
     <title>{{template "title" .}}</title>
 </head>
 <body>
-    {{template "header" .}}
+    <header>
+        <nav>
+            <div class="nav-wrapper">
+                <div class="company-name"><a href="/">SessionsDev</div>
+                <ul class="nav-links">
+                    <li><a href="/game">AI Adventure</a></li>
+                    <li><a href="https://github.com/sessionsdev">My Github</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
     <main>
         {{template "main" .}}
     </main>

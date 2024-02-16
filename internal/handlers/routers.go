@@ -14,6 +14,11 @@ func Init(staticPath string) {
 }
 
 func initializeApiRoutes() {
+	http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
 	http.Handle("/api/hello-world", RequestLoggerMiddleware(http.HandlerFunc(ServeHelloWorldAPI)))
 	http.Handle("/api/process-command", AuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(HandleGameCommand))))
 	http.Handle("/api/game-state", RequestLoggerMiddleware(http.HandlerFunc(HandleGameState)))
