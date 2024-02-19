@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"html/template"
-	"log"
 	"net/http"
 	"time"
 
@@ -44,7 +43,6 @@ func clearGameIdCookie(w http.ResponseWriter) {
 func ServeGamePage(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles(
 		"templates/base.html",
-		"templates/header.html",
 		"templates/game.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -70,28 +68,15 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var gameId string
-	gameIdCookie, err := r.Cookie("GameId")
-	if err != nil {
-		gameId = ""
-	} else {
-		gameId = gameIdCookie.Value
-	}
+	username := r.Context().Value("username").(string)
 
-	resultMsg, game, err := game.ProcessGameCommand(command, gameId)
+	resultMsg, err := game.ProcessGameCommand(command, username)
 	if err != nil {
-		w.Header().Set("Content-Type", "text/html")
-		executeTemplate(w, "templates/error-update.html", "game-update", resultMsg)
-	} else if game == nil {
 		w.Header().Set("Content-Type", "text/html")
 		executeTemplate(w, "templates/error-update.html", "game-update", resultMsg)
 	} else {
 		w.Header().Set("HX-Trigger-After-Settle", "stats-update")
 		w.Header().Set("Content-Type", "text/html")
-
-		if gameId != game.GameId {
-			setGameIdCookie(w, game.GameId)
-		}
 
 		executeTemplate(w, "templates/game-update.html", "game-update", struct {
 			PlayerCommand      string
@@ -123,17 +108,9 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only GET requests are allowed", http.StatusMethodNotAllowed)
 	}
 
-	var gameId string
-	gameIdCookie, err := r.Cookie("GameId")
-	if err != nil {
-		log.Printf("Error getting game id from cookie: %s", err)
-		http.Error(w, "No game id found", http.StatusBadRequest)
-		return
-	} else {
-		gameId = gameIdCookie.Value
-	}
+	username := r.Context().Value("username").(string)
 
-	g, err := game.LoadGameFromRedis(gameId)
+	g, err := game.LoadGameFromRedis(username)
 	if err != nil {
 		http.Error(w, "Error loading game from redis", http.StatusInternalServerError)
 		return

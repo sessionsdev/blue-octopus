@@ -1,7 +1,9 @@
 package redis
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"os"
 	"time"
 
@@ -47,36 +49,47 @@ func Init() {
 		println(pong + " DB: " + name + " is alive!")
 		dbNameToClient[name] = dbClient
 	}
-
-	// Set a value in the user db
-	adminUsername := os.Getenv("ADMIN_USERNAME")
-	adminPassword := os.Getenv("ADMIN_PASSWORD")
-	SetValue("user", adminUsername, adminPassword, 9999999)
 }
 
-func SetGob(key string, value []byte, expMinutes int) error {
-	client := dbNameToClient["game"]
-	err := client.Set(
+func SetObj(dbName string, key string, value interface{}, expMinutes int) error {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(value)
+	if err != nil {
+		return err
+	}
+
+	bytes := buf.Bytes()
+
+	client := dbNameToClient[dbName]
+	err = client.Set(
 		cxt,
 		key,
-		value,
+		bytes,
 		time.Duration(expMinutes)*time.Minute).Err()
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-func GetGob(key string) ([]byte, error) {
-	client := dbNameToClient["game"]
-	bytes, err := client.Get(cxt, key).Bytes()
+func GetObj(dbName string, key string, target interface{}) (interface{}, error) {
+	client := dbNameToClient[dbName]
+	data, err := client.Get(cxt, key).Bytes()
 	if err == redis.Nil {
 		return nil, &NotFoundError{Key: key}
 	} else if err != nil {
 		return nil, err
 	}
 
-	return bytes, nil
+	dec := gob.NewDecoder(bytes.NewReader(data))
+	err = dec.Decode(target)
+	if err != nil {
+		return nil, err
+	}
+
+	return target, nil
 }
 
 func SetValue(dbName string, key string, value string, expMinutes int) error {
@@ -102,4 +115,13 @@ func GetValue(dbName string, key string) (string, error) {
 	}
 
 	return token, nil
+}
+
+func DeleteKey(dbName string, key string) error {
+	client := dbNameToClient[dbName]
+	err := client.Del(cxt, key).Err()
+	if err != nil {
+		return err
+	}
+	return nil
 }

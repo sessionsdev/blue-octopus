@@ -1,45 +1,16 @@
 package handlers
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"html/template"
+	"log"
 	"net/http"
-	"time"
 
-	"github.com/sessionsdev/blue-octopus/internal/redis"
+	"github.com/sessionsdev/blue-octopus/internal/auth"
 )
-
-func AuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !userIsAuthenticated(r) {
-			w.Header().Add("HX-Redirect", "/login")
-			return
-		}
-		// User is authenticated, proceed with the request
-		next.ServeHTTP(w, r)
-	})
-}
-
-func userIsAuthenticated(r *http.Request) bool {
-	sessionCookie, err := r.Cookie("SESSIONS_ID")
-	if err != nil {
-		return false
-	}
-
-	sessionToken := sessionCookie.Value
-	username, err := redis.GetValue("session", sessionToken)
-	if err != nil || username == "" {
-		return false
-	}
-
-	return true
-}
 
 func ServeLogin(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles(
 		"templates/base.html",
-		"templates/header.html",
 		"templates/login.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -51,51 +22,42 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func HandleAuthorization(w http.ResponseWriter, r *http.Request) {
+func HandleLogin(w http.ResponseWriter, r *http.Request) {
 	username, password := r.FormValue("username"), r.FormValue("password")
 	if username == "" || password == "" {
 		http.Error(w, "Missing username or password", http.StatusBadRequest)
 		return
 	}
 
-	// hash the password
-	hash := sha256.New()
-	hash.Write([]byte(password))
-	password = hex.EncodeToString(hash.Sum(nil))
-
-	userPassword, err := redis.GetValue("user", username)
-	if err != nil {
+	login := auth.AuthenticateUser(username, password)
+	if !login {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
-	if userPassword != password {
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
-		return
-	}
-
-	token, err := getEncodedToken(username, password)
+	token, err := auth.SaveSession(username)
 	if err != nil {
-		http.Error(w, "Error encoding token", http.StatusInternalServerError)
+		http.Error(w, "Failed to save session", http.StatusInternalServerError)
 		return
 	}
 
-	redis.SetValue("session", token, username, 24*60)
-	http.SetCookie(w, &http.Cookie{
-		Name:    "SESSIONS_ID",
-		Value:   token,
-		Expires: time.Now().Add(24 * time.Hour),
-		Path:    "/",
-	})
-
+	http.SetCookie(w, auth.BuildSessionCookie(token))
 	w.Header().Add("HX-Redirect", "/")
 }
 
-func getEncodedToken(username, password string) (string, error) {
-	// Implement your authentication logic here
-	// This is just a placeholder
-	hash := sha256.New()
-	hash.Write([]byte(username + password))
-	token := hex.EncodeToString(hash.Sum(nil))
-	return token, nil
+func HandleLogout(w http.ResponseWriter, r *http.Request) {
+	sessionCookie, err := r.Cookie("SESSION_ID")
+	if err != nil {
+		http.Error(w, "No session to logout", http.StatusBadRequest)
+		return
+	}
+
+	sessionToken := sessionCookie.Value
+	err = auth.DeleteSession(sessionToken)
+	if err != nil {
+		log.Println("Failed to delete session: ", err)
+	}
+
+	http.SetCookie(w, auth.BuildDeleteSessionCookie())
+	w.Header().Add("HX-Redirect", "/")
 }

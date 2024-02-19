@@ -3,25 +3,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SessionsDev</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <script src="/static/js/script.js"></script>
-    <script src="/static/js/htmx.min.js"></script>
     <title>{{template "title" .}}</title>
+    
+    <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.sand.min.css"
+  /> <!-- PICO Css -->
+  <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/script.js"></script>
+    <script src="/static/js/htmx.min.js"></script> <!-- htmx.js -->
 </head>
 <body>
     <header>
-        <nav>
-            <div class="nav-wrapper">
-                <div class="company-name"><a href="/">SessionsDev</div>
-                <ul class="nav-links">
-                    <li><a href="/game">AI Adventure</a></li>
-                    <li><a href="https://github.com/sessionsdev">My Github</a></li>
-                </ul>
-            </div>
+        <nav class="container-fluid">
+            <ul>
+                <li><a href="/"><strong>SessionsDev</strong></a></li>
+            </ul>
+            <ul>
+                <li><a href="/game">Ai Adventure</a></li>
+                <li><a href="https://github.com/sessionsdev">My GitHub</a></li>
+            </ul>
         </nav>
     </header>
-    <main>
+    <main class="container">
         {{template "main" .}}
     </main>
 </body>

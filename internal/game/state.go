@@ -1,7 +1,6 @@
 package game
 
 import (
-	"bytes"
 	"encoding/gob"
 	"log"
 
@@ -107,45 +106,21 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
 
 }
 
-func (g *Game) encodeGame() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(g)
-	if err != nil {
-		log.Fatal(err)
-	}
+func SaveGameToRedis(g *Game, username string) {
+	log.Printf("Saving game to redis: %s", username)
 
-	return buf.Bytes()
+	err := redis.SetObj("game", username, g, 0)
+	if err != nil {
+		log.Printf("Error saving game to redis for user: %s", username)
+	}
 }
 
-func decodeGame(encodedGame []byte) *Game {
-	dec := gob.NewDecoder(bytes.NewReader(encodedGame))
+func LoadGameFromRedis(username string) (*Game, error) {
 	var game Game
-	err := dec.Decode(&game)
+	_, err := redis.GetObj("game", username, &game)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return &game
-}
-
-func (g *Game) SaveGameToRedis() {
-	log.Printf("Saving game to redis: %s", g.GameId)
-
-	encodedGame := g.encodeGame()
-	err := redis.SetGob(g.GameId, encodedGame, 0)
-	if err != nil {
-		log.Printf("Error saving game to redis: %s", g.GameId)
-	}
-}
-
-func LoadGameFromRedis(gameId string) (*Game, error) {
-	log.Printf("Loading game from redis: %s", gameId)
-
-	encodedGame, err := redis.GetGob(gameId)
-	if err != nil {
-		return InitializeNewGame(), err
-	}
-
-	return decodeGame(encodedGame), nil
+	return &game, nil
 }

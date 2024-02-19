@@ -1,0 +1,14 @@
+# Ignore all by default
+
+/*
+
+# Explicitly include files we want in the repository
+!.gitignore
+!.env_template
+!/cmd
+!/internal
+!/pkg
+!/static
+!/templates
+!go.mod
+!go.sum

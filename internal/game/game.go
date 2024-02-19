@@ -24,7 +24,6 @@ func (m *GameMessage) NewMessage(provider string, message string) Message {
 }
 
 type Game struct {
-	GameId             string        `json:"game_id"`
 	World              *World        `json:"world"`
 	Player             *Player       `json:"player"`
 	MainQuest          string        `json:"main_quest"`
