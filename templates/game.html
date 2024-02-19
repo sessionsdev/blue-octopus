@@ -9,11 +9,16 @@
                 You are standing in an open field west of a blue house, with a boarded front door. There is a small mailbox here.
             </p>
         </article>
-        <article class="stats-panel" id="game-state-panel" hx-get="/api/stats-display" hx-trigger="every 3s" hx-swap="innerHTML">
+        <article class="stats-panel" id="game-state-panel" hx-get="/game/stats-display" hx-trigger="every 3s" hx-swap="innerHTML">
             <p>Welcome to Adventure AI.  A text based Adventure Game</p>
         </article>
     </div> <!-- End of game-area div -->
-    <form hx-post="/api/process-command" hx-target="#game-output" hx-swap="beforeend scroll:bottom" hx-on::before-request="this.reset()">
+    <form 
+    hx-post="/game/process-command" 
+    hx-target="#game-output" 
+    hx-swap="beforeend scroll:bottom" 
+    hx-on::before-request="this.reset()"
+    >
         <fieldset role="group">
         <input type="text" name="command" id="command-input" placeholder="Enter your command (Go to {LOCATION}, Take {ITEM}, Attack {ENEMY}....)" autocomplete="off">
         <button type="submit">Send</button>

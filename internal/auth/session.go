@@ -29,7 +29,7 @@ func SaveSession(username string) (string, error) {
 	}
 
 	// save session to redis
-	err = redis.SetObj("session", id, username, 24*60)
+	err = redis.SetValue("session", id, username, 24*60)
 	if err != nil {
 		return "", err
 	}
@@ -71,6 +71,9 @@ func ValidateSession(r *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	// print username
+	fmt.Println("Validate sessions - Username: ", username)
 
 	return username, nil
 }

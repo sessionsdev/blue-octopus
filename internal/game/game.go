@@ -1,6 +1,6 @@
 package game
 
-import utils "github.com/sessionsdev/blue-octopus/internal"
+import "github.com/sessionsdev/blue-octopus/internal/util"
 
 type Message interface {
 	NewMessage(string, string) Message
@@ -51,7 +51,7 @@ func BuildNewGame(details NewGameDetails) *Game {
 		},
 		Player: &Player{
 			Name:      details.PlayerName,
-			Inventory: utils.NewStringSet(details.PlayerInventory...),
+			Inventory: util.NewStringSet(details.PlayerInventory...),
 		},
 		GameMessageHistory: []GameMessage{},
 		TotalTokensUsed:    0,
@@ -60,7 +60,7 @@ func BuildNewGame(details NewGameDetails) *Game {
 	// Add the starting location to the world
 	game.World.SafeAddLocation(details.StartingLocation)
 	game.World.CurrentLocation, _ = game.World.GetLocationByName(details.StartingLocation)
-	game.World.CurrentLocation.AdjacentLocationKeys = utils.EmptyStringSet()
+	game.World.CurrentLocation.AdjacentLocationKeys = util.EmptyStringSet()
 
 	for _, locationName := range details.StartingAdjacentLocations {
 		game.World.SafeAddLocation(locationName)

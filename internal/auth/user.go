@@ -61,6 +61,8 @@ func CreateUser(username string, password string, email string) *User {
 }
 
 func GetUser(username string) *User {
+	log.Println("Looking for user: ", username)
+
 	var user User
 	_, err := redis.GetObj("user", username, &user)
 	if err != nil {
@@ -68,6 +70,7 @@ func GetUser(username string) *User {
 		return nil
 	}
 
+	log.Println("Found user: ", username)
 	return &user
 }
 
@@ -95,4 +98,13 @@ func CreateAdminUser(username string, password string, email string) {
 	}
 
 	redis.SetObj("user", username, user, 0)
+}
+
+func IsUserAdmin(username string) bool {
+	log.Println("Checking if user is admin: ", username)
+	user := GetUser(username)
+	if user == nil {
+		return false
+	}
+	return user.IsAdmin()
 }

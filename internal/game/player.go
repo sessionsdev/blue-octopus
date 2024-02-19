@@ -1,8 +1,8 @@
 package game
 
-import utils "github.com/sessionsdev/blue-octopus/internal"
+import "github.com/sessionsdev/blue-octopus/internal/util"
 
 type Player struct {
 	Name      string
-	Inventory utils.StringSet
+	Inventory util.StringSet
 }

@@ -1,0 +1,13 @@
+{{define "title"}}SessionsDev{{end}}
+
+{{define "main"}}
+<h1>Admin Panel</h1>
+<hr/>
+<section>
+    <h2>Users</h2>
+    <ul>
+        {{range .Users}}
+        <li>{{.}}</li>
+        {{end}}
+    </ul>
+{{end}}

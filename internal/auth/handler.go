@@ -1,11 +1,10 @@
-package handlers
+package auth
 
 import (
+	"context"
 	"html/template"
 	"log"
 	"net/http"
-
-	"github.com/sessionsdev/blue-octopus/internal/auth"
 )
 
 func ServeLogin(w http.ResponseWriter, r *http.Request) {
@@ -29,19 +28,19 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	login := auth.AuthenticateUser(username, password)
+	login := AuthenticateUser(username, password)
 	if !login {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
-	token, err := auth.SaveSession(username)
+	token, err := SaveSession(username)
 	if err != nil {
 		http.Error(w, "Failed to save session", http.StatusInternalServerError)
 		return
 	}
 
-	http.SetCookie(w, auth.BuildSessionCookie(token))
+	http.SetCookie(w, BuildSessionCookie(token))
 	w.Header().Add("HX-Redirect", "/")
 }
 
@@ -53,11 +52,48 @@ func HandleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionToken := sessionCookie.Value
-	err = auth.DeleteSession(sessionToken)
+	err = DeleteSession(sessionToken)
 	if err != nil {
 		log.Println("Failed to delete session: ", err)
 	}
 
-	http.SetCookie(w, auth.BuildDeleteSessionCookie())
+	http.SetCookie(w, BuildDeleteSessionCookie())
 	w.Header().Add("HX-Redirect", "/")
+}
+
+func AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println("AuthMiddleware")
+
+		username, err := ValidateSession(r)
+		if err != nil {
+			handleLoginRedirect(w, r)
+			return
+		}
+
+		// set user object in context
+		user := GetUser(username)
+		if user == nil {
+			handleLoginRedirect(w, r)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), "user", user)
+
+		// User is authenticated, proceed with the request
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func handleLoginRedirect(w http.ResponseWriter, r *http.Request) {
+	// if htmx request, set header
+	hxRequest := r.Header.Get("Hx-Request")
+	if hxRequest == "true" {
+		w.Header().Add("HX-Redirect", "/login")
+		w.WriteHeader(http.StatusSeeOther)
+		return
+	} else {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
 }

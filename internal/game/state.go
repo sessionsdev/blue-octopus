@@ -4,14 +4,14 @@ import (
 	"encoding/gob"
 	"log"
 
-	utils "github.com/sessionsdev/blue-octopus/internal"
 	"github.com/sessionsdev/blue-octopus/internal/redis"
+	"github.com/sessionsdev/blue-octopus/internal/util"
 )
 
 func init() {
 	gob.Register(GameMessage{})
 	gob.Register(map[string]struct{}{})
-	gob.Register(utils.StringSet{})
+	gob.Register(util.StringSet{})
 }
 
 type GameStateUpdateResponse struct {

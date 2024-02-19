@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"log"
 	"os"
 	"time"
 
@@ -78,14 +79,17 @@ func GetObj(dbName string, key string, target interface{}) (interface{}, error) 
 	client := dbNameToClient[dbName]
 	data, err := client.Get(cxt, key).Bytes()
 	if err == redis.Nil {
+		log.Println("Key not found: ", key)
 		return nil, &NotFoundError{Key: key}
 	} else if err != nil {
+		log.Println("Error getting: ", err)
 		return nil, err
 	}
 
 	dec := gob.NewDecoder(bytes.NewReader(data))
 	err = dec.Decode(target)
 	if err != nil {
+		log.Println("Error decoding: ", err)
 		return nil, err
 	}
 
@@ -107,14 +111,14 @@ func SetValue(dbName string, key string, value string, expMinutes int) error {
 
 func GetValue(dbName string, key string) (string, error) {
 	client := dbNameToClient[dbName]
-	token, err := client.Get(cxt, key).Result()
+	value, err := client.Get(cxt, key).Result()
 	if err == redis.Nil {
 		return "", &NotFoundError{Key: key}
 	} else if err != nil {
 		return "", err
 	}
 
-	return token, nil
+	return value, nil
 }
 
 func DeleteKey(dbName string, key string) error {
@@ -124,4 +128,14 @@ func DeleteKey(dbName string, key string) error {
 		return err
 	}
 	return nil
+}
+
+// get all keys from a db
+func GetAllKeys(dbName string) ([]string, error) {
+	client := dbNameToClient[dbName]
+	keys, err := client.Keys(cxt, "*").Result()
+	if err != nil {
+		return nil, err
+	}
+	return keys, nil
 }

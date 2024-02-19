@@ -4,14 +4,14 @@ import (
 	"log"
 	"strings"
 
-	utils "github.com/sessionsdev/blue-octopus/internal"
+	"github.com/sessionsdev/blue-octopus/internal/util"
 )
 
 type Location struct {
 	LocationName         string
-	AdjacentLocationKeys utils.StringSet
-	InteractiveItems     utils.StringSet
-	Enemies              utils.StringSet
+	AdjacentLocationKeys util.StringSet
+	InteractiveItems     util.StringSet
+	Enemies              util.StringSet
 }
 
 func (l *Location) SafeAddAdjacentLocation(adjLocation *Location) {
@@ -99,9 +99,9 @@ func (w *World) SafeAddLocation(locationName string) *Location {
 	if !ok {
 		location = &Location{
 			LocationName:         locationName,
-			AdjacentLocationKeys: utils.EmptyStringSet(),
-			InteractiveItems:     utils.EmptyStringSet(),
-			Enemies:              utils.EmptyStringSet(),
+			AdjacentLocationKeys: util.EmptyStringSet(),
+			InteractiveItems:     util.EmptyStringSet(),
+			Enemies:              util.EmptyStringSet(),
 		}
 
 		// add the location to the world

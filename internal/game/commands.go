@@ -33,7 +33,6 @@ func ProcessGameCommand(command string, username string) (string, error) {
 }
 
 func (g *Game) processPlayerPrompt(command string, username string) (string, error) {
-	log.Println("Game command processing: ", gameCommandProcessing)
 	if gameCommandProcessing {
 		return "", fmt.Errorf("game command processing is already in progress. Please wait a moment and try again.")
 	}
@@ -61,8 +60,8 @@ func (g *Game) processPlayerPrompt(command string, username string) (string, err
 	// get the raw response message
 	responseMessage := response.GetChatCompletion()
 
-	assistantMessage := GameMessage{Provider: "assistant", Message: responseMessage}
 	userMessage := GameMessage{Provider: "user", Message: command}
+	assistantMessage := GameMessage{Provider: "assistant", Message: responseMessage}
 
 	g.UpdateGameHistory(userMessage, assistantMessage)
 

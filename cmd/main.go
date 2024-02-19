@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 
 	"github.com/sessionsdev/blue-octopus/internal/auth"
-	"github.com/sessionsdev/blue-octopus/internal/handlers"
 	"github.com/sessionsdev/blue-octopus/internal/redis"
+	"github.com/sessionsdev/blue-octopus/internal/router"
 )
 
 func main() {
 	staticPath := filepath.Join(".", "static")
-	handlers.Init(staticPath)
+	router.Init(staticPath)
 	redis.Init()
 
 	adminUsername := os.Getenv("ADMIN_USERNAME")
