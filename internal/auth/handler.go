@@ -22,19 +22,19 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleLogin(w http.ResponseWriter, r *http.Request) {
-	username, password := r.FormValue("username"), r.FormValue("password")
-	if username == "" || password == "" {
+	email, password := r.FormValue("username"), r.FormValue("password")
+	if email == "" || password == "" {
 		http.Error(w, "Missing username or password", http.StatusBadRequest)
 		return
 	}
 
-	login := AuthenticateUser(username, password)
+	login := AuthenticateUser(email, password)
 	if !login {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
-	token, err := SaveSession(username)
+	token, err := SaveSession(email)
 	if err != nil {
 		http.Error(w, "Failed to save session", http.StatusInternalServerError)
 		return
@@ -65,14 +65,14 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("AuthMiddleware")
 
-		username, err := ValidateSession(r)
+		email, err := ValidateSession(r)
 		if err != nil {
 			handleLoginRedirect(w, r)
 			return
 		}
 
 		// set user object in context
-		user := GetUser(username)
+		user := GetUserByEmail(email)
 		if user == nil {
 			handleLoginRedirect(w, r)
 			return

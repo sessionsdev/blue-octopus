@@ -10,7 +10,21 @@ import (
 )
 
 type AdminData struct {
-	Users []auth.User
+	Users []AdminUserData
+}
+
+type AdminUserData struct {
+	Email     string
+	Role      string
+	EmailHash string
+}
+
+func BuildFromAuthUser(user auth.User) AdminUserData {
+	return AdminUserData{
+		Email:     user.Email,
+		Role:      user.Role,
+		EmailHash: user.HashEmail(),
+	}
 }
 
 func ServeAdminPage(w http.ResponseWriter, r *http.Request) {
@@ -42,14 +56,14 @@ func ServeAdminPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getUsers() []auth.User {
+func getUsers() []AdminUserData {
 	usernames, err := redis.GetAllKeys("user")
 	if err != nil {
 		log.Println("Failed to get user keys from redis: ", err)
 		return nil
 	}
 
-	users := make([]auth.User, 0)
+	users := make([]AdminUserData, 0)
 	for _, username := range usernames {
 		var user auth.User
 		_, err := redis.GetObj("user", username, &user)
@@ -57,8 +71,12 @@ func getUsers() []auth.User {
 			log.Println("Failed to get user from redis: ", err)
 			continue
 		}
-		users = append(users, user)
+		users = append(users, BuildFromAuthUser(user))
 	}
 
 	return users
+}
+
+func HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
+
 }

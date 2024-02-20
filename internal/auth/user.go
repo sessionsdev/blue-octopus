@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"log"
 	"net/mail"
 
@@ -9,10 +11,13 @@ import (
 )
 
 type User struct {
-	Username     string
 	PasswordHash string
 	Email        string
 	Role         string
+}
+
+func (u *User) HashEmail() string {
+	return getStringHash(u.Email)
 }
 
 func (u *User) CheckPassword(password string) bool {
@@ -24,7 +29,7 @@ func (u *User) IsAdmin() bool {
 	return u.Role == "ADMIN"
 }
 
-func hashPassword(password string) string {
+func encryptPassword(password string) string {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		panic(err)
@@ -33,9 +38,9 @@ func hashPassword(password string) string {
 	return string(bytes)
 }
 
-func CreateUser(username string, password string, email string) *User {
-	if GetUser(username) != nil {
-		log.Println("User already exists: ", username)
+func CreateUser(password string, email string) *User {
+	if GetUserByEmail(email) != nil {
+		log.Println("User already exists: ", email)
 		return nil
 	}
 
@@ -49,62 +54,65 @@ func CreateUser(username string, password string, email string) *User {
 	}
 
 	var user *User
-
 	user = &User{
-		Username:     username,
-		PasswordHash: hashPassword(password),
+		Email:        email,
+		PasswordHash: encryptPassword(password),
 		Role:         "USER",
 	}
 
-	redis.SetObj("user", username, user, 0)
+	redis.SetObj("user", user.HashEmail(), user, 0)
 	return user
 }
 
-func GetUser(username string) *User {
-	log.Println("Looking for user: ", username)
+func GetUserByEmail(email string) *User {
+	emailHash := getStringHash(email)
 
 	var user User
-	_, err := redis.GetObj("user", username, &user)
+	_, err := redis.GetObj("user", emailHash, &user)
 	if err != nil {
-		log.Println("User not found: ", username)
 		return nil
 	}
 
-	log.Println("Found user: ", username)
 	return &user
 }
 
-func AuthenticateUser(username string, password string) bool {
-	user := GetUser(username)
+func AuthenticateUser(email string, password string) bool {
+	user := GetUserByEmail(email)
 	if user == nil {
-		log.Println("User not found: ", username)
+		log.Println("User not found: ", email)
 		return false
 	}
-	log.Println("Authenticating user: ", username)
+	log.Println("Authenticating user: ", email)
 
 	return user.CheckPassword(password)
 }
 
-func CreateAdminUser(username string, password string, email string) {
-	if GetUser(username) != nil {
-		log.Println("Admin user already exists: ", username)
+func CreateAdminUser(password string, email string) {
+	if GetUserByEmail(email) != nil {
+		log.Println("Admin user already exists: ", email)
 		return
 	}
 	user := &User{
-		Username:     username,
-		PasswordHash: hashPassword(password),
+		PasswordHash: encryptPassword(password),
 		Email:        email,
 		Role:         "ADMIN",
 	}
 
-	redis.SetObj("user", username, user, 0)
+	redis.SetObj("user", user.HashEmail(), user, 0)
 }
 
-func IsUserAdmin(username string) bool {
-	log.Println("Checking if user is admin: ", username)
-	user := GetUser(username)
+func IsUserAdmin(email string) bool {
+	log.Println("Checking if user is admin: ", email)
+	user := GetUserByEmail(email)
 	if user == nil {
 		return false
 	}
 	return user.IsAdmin()
+}
+
+func getStringHash(s string) string {
+	log.Println("Hashing string: ", s)
+	hasher := md5.New()
+	hasher.Write([]byte(s))
+	return hex.EncodeToString(hasher.Sum(nil))
 }

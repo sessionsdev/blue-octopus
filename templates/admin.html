@@ -5,9 +5,19 @@
 <hr/>
 <section>
     <h2>Users</h2>
-    <ul>
+    <table>
+        <tr>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Actions</th>
+        </tr>
         {{range .Users}}
-        <li>{{.}}</li>
+        <tr>
+            <td>{{.Email}}</td>
+            <td>{{.Role}}</td>
+            <td>PENDING</td>
+        </tr>
         {{end}}
-    </ul>
+    </table>
+</section>
 {{end}}
