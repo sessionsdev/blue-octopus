@@ -5,21 +5,10 @@ import (
 	"context"
 	"encoding/gob"
 	"log"
-	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
-
-var dbnameToDbId = map[string]int{
-	"game":    0,
-	"user":    1,
-	"session": 2,
-}
-
-var dbNameToClient = map[string]*redis.Client{}
-
-var cxt = context.Background()
 
 type NotFoundError struct {
 	Key string
@@ -29,30 +18,7 @@ func (e *NotFoundError) Error() string {
 	return "Key not found: " + e.Key
 }
 
-func Init() {
-	// Get env variables
-	redisHost := os.Getenv("REDIS_HOST")
-	redisPort := os.Getenv("REDIS_PORT")
-
-	// populate name to client map
-	for name, dbId := range dbnameToDbId {
-		dbClient := redis.NewClient(&redis.Options{
-			Addr:     redisHost + ":" + redisPort,
-			Password: "",
-			DB:       dbId,
-		})
-
-		pong, err := dbClient.Ping(cxt).Result()
-		if err != nil {
-			panic(err)
-		}
-
-		println(pong + " DB: " + name + " is alive!")
-		dbNameToClient[name] = dbClient
-	}
-}
-
-func SetObj(dbName string, key string, value interface{}, expMinutes int) error {
+func SetObj(ctx context.Context, key RedisKey, value interface{}, expMinutes int) error {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(value)
@@ -62,10 +28,9 @@ func SetObj(dbName string, key string, value interface{}, expMinutes int) error 
 
 	bytes := buf.Bytes()
 
-	client := dbNameToClient[dbName]
-	err = client.Set(
-		cxt,
-		key,
+	err = Client.Set(
+		ctx,
+		key.GetKey(),
 		bytes,
 		time.Duration(expMinutes)*time.Minute).Err()
 	if err != nil {
@@ -75,12 +40,11 @@ func SetObj(dbName string, key string, value interface{}, expMinutes int) error 
 	return nil
 }
 
-func GetObj(dbName string, key string, target interface{}) (interface{}, error) {
-	client := dbNameToClient[dbName]
-	data, err := client.Get(cxt, key).Bytes()
+func GetObj(ctx context.Context, key RedisKey, target interface{}) (interface{}, error) {
+	data, err := Client.Get(ctx, key.GetKey()).Bytes()
 	if err == redis.Nil {
 		log.Println("Key not found: ", key)
-		return nil, &NotFoundError{Key: key}
+		return nil, &NotFoundError{Key: key.GetKey()}
 	} else if err != nil {
 		log.Println("Error getting: ", err)
 		return nil, err
@@ -96,11 +60,10 @@ func GetObj(dbName string, key string, target interface{}) (interface{}, error) 
 	return target, nil
 }
 
-func SetValue(dbName string, key string, value string, expMinutes int) error {
-	client := dbNameToClient[dbName]
-	err := client.Set(
-		cxt,
-		key,
+func SetValue(ctx context.Context, key RedisKey, value string, expMinutes int) error {
+	err := Client.Set(
+		ctx,
+		key.GetKey(),
 		value,
 		time.Duration(expMinutes)*time.Minute).Err()
 	if err != nil {
@@ -109,11 +72,10 @@ func SetValue(dbName string, key string, value string, expMinutes int) error {
 	return nil
 }
 
-func GetValue(dbName string, key string) (string, error) {
-	client := dbNameToClient[dbName]
-	value, err := client.Get(cxt, key).Result()
+func GetValue(ctx context.Context, key RedisKey) (string, error) {
+	value, err := Client.Get(ctx, key.GetKey()).Result()
 	if err == redis.Nil {
-		return "", &NotFoundError{Key: key}
+		return "", &NotFoundError{Key: key.GetKey()}
 	} else if err != nil {
 		return "", err
 	}
@@ -121,9 +83,8 @@ func GetValue(dbName string, key string) (string, error) {
 	return value, nil
 }
 
-func DeleteKey(dbName string, key string) error {
-	client := dbNameToClient[dbName]
-	err := client.Del(cxt, key).Err()
+func DeleteKey(ctx context.Context, key RedisKey) error {
+	err := Client.Del(ctx, key.GetKey()).Err()
 	if err != nil {
 		return err
 	}
@@ -131,9 +92,9 @@ func DeleteKey(dbName string, key string) error {
 }
 
 // get all keys from a db
-func GetAllKeys(dbName string) ([]string, error) {
-	client := dbNameToClient[dbName]
-	keys, err := client.Keys(cxt, "*").Result()
+func GetAllUserDetailKeys(ctx context.Context) ([]string, error) {
+	// TODO - this is not efficient.  Should use scan or a set
+	keys, err := Client.Keys(ctx, "user:details:*").Result()
 	if err != nil {
 		return nil, err
 	}

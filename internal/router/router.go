@@ -22,7 +22,9 @@ func Init(staticPath string) {
 
 // intialize the admin routes
 func initializeAdminRoutes() {
-	http.Handle("/admin", auth.AuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(admin.ServeAdminPage))))
+	http.Handle("/admin", auth.AdminAuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(admin.ServeAdminPage))))
+	http.Handle("/admin/create-user", auth.AdminAuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(admin.HandleCreateUserForm))))
+	http.Handle("/admin/delete-user", auth.AdminAuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(admin.HandleDeleteUserAction))))
 }
 
 // intialize the ai adventure game routes

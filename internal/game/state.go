@@ -1,6 +1,7 @@
 package game
 
 import (
+	"context"
 	"encoding/gob"
 	"log"
 
@@ -106,18 +107,20 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
 
 }
 
-func SaveGameToRedis(g *Game, username string) {
-	log.Printf("Saving game to redis: %s", username)
+func SaveGameToRedis(ctx context.Context, g *Game, email string) {
+	key := &redis.UserSavedGameKey{Email: email}
 
-	err := redis.SetObj("game", username, g, 0)
+	err := redis.SetObj(ctx, key, g, 0)
 	if err != nil {
-		log.Printf("Error saving game to redis for user: %s", username)
+		log.Printf("Error saving game to redis for user: %s", email)
 	}
 }
 
-func LoadGameFromRedis(username string) (*Game, error) {
+func LoadGameFromRedis(ctx context.Context, email string) (*Game, error) {
+	key := &redis.UserSavedGameKey{Email: email}
+
 	var game Game
-	_, err := redis.GetObj("game", username, &game)
+	_, err := redis.GetObj(ctx, key, &game)
 	if err != nil {
 		return nil, err
 	}

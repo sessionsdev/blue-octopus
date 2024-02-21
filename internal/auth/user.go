@@ -1,7 +1,8 @@
 package auth
 
 import (
-	"crypto/md5"
+	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"log"
 	"net/mail"
@@ -38,8 +39,8 @@ func encryptPassword(password string) string {
 	return string(bytes)
 }
 
-func CreateUser(password string, email string) *User {
-	if GetUserByEmail(email) != nil {
+func CreateUser(ctx context.Context, email string, password string) *User {
+	if GetUserByEmail(ctx, email) != nil {
 		log.Println("User already exists: ", email)
 		return nil
 	}
@@ -60,15 +61,16 @@ func CreateUser(password string, email string) *User {
 		Role:         "USER",
 	}
 
-	redis.SetObj("user", user.HashEmail(), user, 0)
+	key := &redis.UserDetailsKey{Email: email}
+	redis.SetObj(ctx, key, user, 0)
 	return user
 }
 
-func GetUserByEmail(email string) *User {
-	emailHash := getStringHash(email)
+func GetUserByEmail(ctx context.Context, email string) *User {
+	key := &redis.UserDetailsKey{Email: email}
 
 	var user User
-	_, err := redis.GetObj("user", emailHash, &user)
+	_, err := redis.GetObj(ctx, key, &user)
 	if err != nil {
 		return nil
 	}
@@ -76,19 +78,16 @@ func GetUserByEmail(email string) *User {
 	return &user
 }
 
-func AuthenticateUser(email string, password string) bool {
-	user := GetUserByEmail(email)
+func AuthenticateUser(ctx context.Context, email string, password string) bool {
+	user := GetUserByEmail(ctx, email)
 	if user == nil {
-		log.Println("User not found: ", email)
 		return false
 	}
-	log.Println("Authenticating user: ", email)
-
 	return user.CheckPassword(password)
 }
 
-func CreateAdminUser(password string, email string) {
-	if GetUserByEmail(email) != nil {
+func CreateAdminUser(ctx context.Context, password string, email string) {
+	if GetUserByEmail(ctx, email) != nil {
 		log.Println("Admin user already exists: ", email)
 		return
 	}
@@ -98,12 +97,13 @@ func CreateAdminUser(password string, email string) {
 		Role:         "ADMIN",
 	}
 
-	redis.SetObj("user", user.HashEmail(), user, 0)
+	key := &redis.UserDetailsKey{Email: email}
+	redis.SetObj(ctx, key, user, 0)
 }
 
-func IsUserAdmin(email string) bool {
+func IsUserAdmin(ctx context.Context, email string) bool {
 	log.Println("Checking if user is admin: ", email)
-	user := GetUserByEmail(email)
+	user := GetUserByEmail(ctx, email)
 	if user == nil {
 		return false
 	}
@@ -111,8 +111,7 @@ func IsUserAdmin(email string) bool {
 }
 
 func getStringHash(s string) string {
-	log.Println("Hashing string: ", s)
-	hasher := md5.New()
+	hasher := sha256.New()
 	hasher.Write([]byte(s))
 	return hex.EncodeToString(hasher.Sum(nil))
 }

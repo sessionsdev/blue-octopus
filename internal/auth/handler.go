@@ -28,13 +28,13 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	login := AuthenticateUser(email, password)
+	login := AuthenticateUser(r.Context(), email, password)
 	if !login {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
-	token, err := SaveSession(email)
+	token, err := SaveSession(r.Context(), email)
 	if err != nil {
 		http.Error(w, "Failed to save session", http.StatusInternalServerError)
 		return
@@ -52,7 +52,7 @@ func HandleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionToken := sessionCookie.Value
-	err = DeleteSession(sessionToken)
+	err = DeleteSession(r.Context(), sessionToken)
 	if err != nil {
 		log.Println("Failed to delete session: ", err)
 	}
@@ -63,7 +63,6 @@ func HandleLogout(w http.ResponseWriter, r *http.Request) {
 
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("AuthMiddleware")
 
 		email, err := ValidateSession(r)
 		if err != nil {
@@ -72,8 +71,31 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// set user object in context
-		user := GetUserByEmail(email)
+		user := GetUserByEmail(r.Context(), email)
 		if user == nil {
+			handleLoginRedirect(w, r)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), "user", user)
+
+		// User is authenticated, proceed with the request
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func AdminAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		email, err := ValidateSession(r)
+		if err != nil {
+			handleLoginRedirect(w, r)
+			return
+		}
+
+		// set user object in context
+		user := GetUserByEmail(r.Context(), email)
+		if user == nil || !user.IsAdmin() {
 			handleLoginRedirect(w, r)
 			return
 		}

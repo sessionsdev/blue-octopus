@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,7 +20,7 @@ func main() {
 
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	adminEmail := os.Getenv("ADMIN_EMAIL")
-	auth.CreateAdminUser(adminPassword, adminEmail)
+	auth.CreateAdminUser(context.TODO(), adminPassword, adminEmail)
 
 	fmt.Println("Server is running at http://localhost:8090")
 	log.Fatal(http.ListenAndServe(":8090", nil))

@@ -1,8 +1,9 @@
 package auth
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"time"
@@ -16,20 +17,21 @@ type UserSession struct {
 	ExpiresAt time.Time
 }
 
-func SaveSession(username string) (string, error) {
+func SaveSession(ctx context.Context, email string) (string, error) {
 	// validate session
-	if username == "" {
+	if email == "" {
 		return "", fmt.Errorf("username is required")
 	}
 
 	// generate session id
-	id, err := getUsernameHash(username)
+	id, err := generateSessionID(32)
 	if err != nil {
 		return "", err
 	}
 
 	// save session to redis
-	err = redis.SetValue("session", id, username, 24*60)
+	key := &redis.UserSessionKey{SessionID: id}
+	err = redis.SetValue(ctx, key, email, 24*60)
 	if err != nil {
 		return "", err
 	}
@@ -37,8 +39,9 @@ func SaveSession(username string) (string, error) {
 	return id, nil
 }
 
-func DeleteSession(sessionId string) error {
-	return redis.DeleteKey("session", sessionId)
+func DeleteSession(ctx context.Context, sessionId string) error {
+	key := &redis.UserSessionKey{SessionID: sessionId}
+	return redis.DeleteKey(ctx, key)
 }
 
 func BuildSessionCookie(sessionId string) *http.Cookie {
@@ -67,7 +70,8 @@ func ValidateSession(r *http.Request) (string, error) {
 
 	// get session from redis
 	sessionId := cookie.Value
-	username, err := redis.GetValue("session", sessionId)
+	key := &redis.UserSessionKey{SessionID: sessionId}
+	username, err := redis.GetValue(r.Context(), key)
 	if err != nil {
 		return "", err
 	}
@@ -78,10 +82,12 @@ func ValidateSession(r *http.Request) (string, error) {
 	return username, nil
 }
 
-func getUsernameHash(username string) (string, error) {
-	// Create a session token by hashing the username and password with a secret key
-	hash := sha256.New()
-	hash.Write([]byte(username))
-	token := hex.EncodeToString(hash.Sum(nil))
-	return token, nil
+func generateSessionID(length int) (string, error) {
+	b := make([]byte, length)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }

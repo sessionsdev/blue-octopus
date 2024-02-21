@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+
+	"github.com/sessionsdev/blue-octopus/internal/auth"
 )
 
 type Command struct {
@@ -43,9 +45,15 @@ func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := r.Context().Value("username").(string)
+	userValue := r.Context().Value("user")
+	if userValue == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
-	resultMsg, err := ProcessGameCommand(command, username)
+	user := userValue.(*auth.User)
+
+	resultMsg, err := ProcessGameCommand(r.Context(), command, user.Email)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html")
 		executeTemplate(w, "templates/error-update.html", "game-update", resultMsg)
@@ -85,7 +93,7 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 
 	username := r.Context().Value("username").(string)
 
-	g, err := LoadGameFromRedis(username)
+	g, err := LoadGameFromRedis(r.Context(), username)
 	if err != nil {
 		http.Error(w, "Error loading game from redis", http.StatusInternalServerError)
 		return

@@ -1,6 +1,7 @@
 package game
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,20 +11,20 @@ import (
 
 var gameCommandProcessing bool
 
-func ProcessGameCommand(command string, username string) (string, error) {
+func ProcessGameCommand(ctx context.Context, command string, username string) (string, error) {
 	switch command {
 	case "RESET GAME":
 		g := InitializeNewGame()
-		SaveGameToRedis(g, username)
+		SaveGameToRedis(ctx, g, username)
 		return fmt.Sprintf("RESET GAME: New game created!"), nil
 	default:
-		g, err := LoadGameFromRedis(username)
+		g, err := LoadGameFromRedis(ctx, username)
 		if err != nil {
 			log.Println("Error loading game from redis: ", err)
 			return `No game found. Try using the "RESET GAME" command`, nil
 		}
 
-		narrativeResponse, err := g.processPlayerPrompt(command, username)
+		narrativeResponse, err := g.processPlayerPrompt(ctx, command, username)
 		if err != nil {
 			return fmt.Sprintf("An error occured processing the command: %s", command), err
 		}
@@ -32,7 +33,7 @@ func ProcessGameCommand(command string, username string) (string, error) {
 	}
 }
 
-func (g *Game) processPlayerPrompt(command string, username string) (string, error) {
+func (g *Game) processPlayerPrompt(ctx context.Context, command string, username string) (string, error) {
 	if gameCommandProcessing {
 		return "", fmt.Errorf("game command processing is already in progress. Please wait a moment and try again.")
 	}
@@ -80,7 +81,7 @@ func (g *Game) processPlayerPrompt(command string, username string) (string, err
 	go func() {
 		<-done
 		<-done
-		SaveGameToRedis(g, username)
+		SaveGameToRedis(ctx, g, username)
 		g.populatePreparedStatsCache()
 		gameCommandProcessing = false
 	}()
