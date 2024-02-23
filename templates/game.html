@@ -26,8 +26,17 @@
     </form>
 </section>
 <section>
+    <h2>What is this?</h2>
     <p>
-        Tips: Try to go to the house, take the key, and unlock the door.  Then go inside and explore.
+        This is a text based adventure game in the spirit of games like Zork and Colossal Cave Adventure.  The game is driven by the openAI api and the gpt models.  The idea is that the llm will generate the game world and the narrative on the fly.  The game is a work in progress and is being developed as a learning project.  The game is written in Go and the front end is a mix of htmx and html templates.
     </p>
+    <h2>How To Play</h2>
+    <p>
+        Simply input a prompt describing your characters action in response to the game world.  Your command will be parsed and routed to the AI "game masters" who will generate a response.
+    </p>
+    <p>
+        For example, you could type "Go to the house" or "Take the sword" or "Attack the dragon".  The game will respond with a narrative of what happens next and will update the game state.  Both the narrative response and the game state are managed by the AI, and are therefore prone to errors and narrative inconsistencies.  This will be ironed out with fine tuning over time.
+    </p>
+    
 </section>
 {{end}}
