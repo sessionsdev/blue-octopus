@@ -30,6 +30,7 @@ type Game struct {
 	StoryThreads       []string      `json:"story_threads"`
 	GameMessageHistory []GameMessage `json:"game_message_history"`
 	TotalTokensUsed    int           `json:"total_tokens_used"`
+	Processing         bool          `json:"processing"`
 }
 
 func (g *Game) GetRecentHistory(numItems int) []GameMessage {

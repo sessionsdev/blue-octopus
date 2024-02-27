@@ -109,6 +109,7 @@ func (g *Game) handleLocationUpdate(stateUpdate GameStateUpdateResponse) {
 
 func SaveGameToRedis(ctx context.Context, g *Game, email string) {
 	key := &redis.UserSavedGameKey{Email: email}
+	log.Printf("Saving game to redis for user:%s, with key:%s", email, key.GetKey())
 
 	err := redis.SetObj(ctx, key, g, 0)
 	if err != nil {
@@ -118,6 +119,7 @@ func SaveGameToRedis(ctx context.Context, g *Game, email string) {
 
 func LoadGameFromRedis(ctx context.Context, email string) (*Game, error) {
 	key := &redis.UserSavedGameKey{Email: email}
+	log.Printf("Loading game from redis for user:%s, with key:%s", email, key.GetKey())
 
 	var game Game
 	_, err := redis.GetObj(ctx, key, &game)

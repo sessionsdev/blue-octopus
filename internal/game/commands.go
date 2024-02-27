@@ -1,7 +1,6 @@
 package game
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,35 +10,37 @@ import (
 
 var gameCommandProcessing bool
 
-func ProcessGameCommand(ctx context.Context, command string, username string) (string, error) {
-	switch command {
-	case "RESET GAME":
-		g := InitializeNewGame()
-		SaveGameToRedis(ctx, g, username)
-		return fmt.Sprintf("RESET GAME: New game created!"), nil
-	default:
-		g, err := LoadGameFromRedis(ctx, username)
-		if err != nil {
-			log.Println("Error loading game from redis: ", err)
-			return `No game found. Try using the "RESET GAME" command`, nil
-		}
+// func ProcessGameCommand(ctx context.Context, command string) (string, error) {
+// 	userContext := ctx.Value("user")
+// 	if userContext == nil {
+// 		return "Unauthorized", fmt.Errorf("Unauthorized")
+// 	}
 
-		narrativeResponse, err := g.processPlayerPrompt(ctx, command, username)
-		if err != nil {
-			return fmt.Sprintf("An error occured processing the command: %s", command), err
-		}
+// 	user := userContext.(*auth.User)
+// 	username := user.Email
 
-		return narrativeResponse, nil
-	}
-}
+// 	switch command {
+// 	case "RESET GAME":
+// 		g := InitializeNewGame()
+// 		SaveGameToRedis(ctx, g, username)
+// 		return fmt.Sprintf("RESET GAME: New game created!"), nil
+// 	default:
+// 		g, err := LoadGameFromRedis(ctx, username)
+// 		if err != nil {
+// 			log.Println("Error loading game from redis: ", err)
+// 			return `No game found. Try using the "RESET GAME" command`, nil
+// 		}
 
-func (g *Game) processPlayerPrompt(ctx context.Context, command string, username string) (string, error) {
-	if gameCommandProcessing {
-		return "", fmt.Errorf("game command processing is already in progress. Please wait a moment and try again.")
-	}
+// 		narrativeResponse, err := g.ProcessPlayerPrompt(ctx, command)
+// 		if err != nil {
+// 			return fmt.Sprintf("An error occured processing the command: %s", command), err
+// 		}
 
-	gameCommandProcessing = true
+// 		return narrativeResponse, nil
+// 	}
+// }
 
+func (g *Game) ProcessPlayerPrompt(command string) (string, error) {
 	messages := []GameMessage{
 		{Provider: "system", Message: GAME_MASTER_RESPONSABILITY_PROMPT},
 		{Provider: "system", Message: BuildGameMasterStatePrompt(g)},
@@ -66,30 +67,10 @@ func (g *Game) processPlayerPrompt(ctx context.Context, command string, username
 
 	g.UpdateGameHistory(userMessage, assistantMessage)
 
-	// Reconcile the game state
-	done := make(chan bool)
-	go func() {
-		g.ReconcileGameState()
-		done <- true
-	}()
-
-	go func() {
-		g.progressStoryThreads()
-		done <- true
-	}()
-
-	go func() {
-		<-done
-		<-done
-		SaveGameToRedis(ctx, g, username)
-		g.populatePreparedStatsCache()
-		gameCommandProcessing = false
-	}()
-
 	return responseMessage, nil
 }
 
-func (g *Game) ReconcileGameState() {
+func (g *Game) reconcileGameState() {
 	messages := []GameMessage{
 		{Provider: "system", Message: STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT},
 		{Provider: "system", Message: BuildStateManagerPrompt(g)},

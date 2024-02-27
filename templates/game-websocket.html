@@ -1,0 +1,40 @@
+{{define "title"}}Socket Test{{end}}
+
+
+{{ define "main" }}
+<script src="https://unpkg.com/htmx.org/dist/ext/ws.js"></script>
+<script>
+    function scrollToBottom(id) {
+        var element = document.getElementById(id);
+        element.scrollTop = element.scrollHeight;
+}
+</script>
+
+
+
+<section 
+hx-ext="ws" 
+ws-connect="/game-web-socket" 
+hx-on:htmx:ws-after-send="document.getElementById('form').reset();"
+hx-on:htmx:ws-after-message="scrollToBottom('game-output');"
+>
+    <div class="game-container"> <!-- This div wraps game output and state panel for side-by-side layout -->
+        <article class="game-output overflow-auto" id="game-output">
+            <p>
+                You are standing in an open field west of a blue house, with a boarded front door. There is a small mailbox here.
+            </p>
+        </article>
+        <article class="stats-panel" id="game-state-panel">
+            <p>Welcome to Adventure AI.  A text based Adventure Game</p>
+        </article>
+    </div>
+    <form id="form" >
+        <fieldset role="group">
+        <input type="text" name="prompt" id="command-input" placeholder="Enter your prompt (Go to {LOCATION}, Take {ITEM}, Attack {ENEMY}....)" autocomplete="off">
+        <button type="submit" ws-send>
+            Send
+        </button>
+        </fieldset>
+    </form>
+</section>
+{{ end }}

@@ -8,69 +8,6 @@ import (
 	"github.com/sessionsdev/blue-octopus/internal/auth"
 )
 
-type Command struct {
-	Command string `json:"command"`
-}
-
-type UserPromptWithState struct {
-	Prompt               string `json:"prompt"`
-	ProposedStateChanges string `json:"proposed_state_changes"`
-}
-
-func ServeGamePage(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles(
-		"templates/base.html",
-		"templates/game.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = tmpl.ExecuteTemplate(w, "base", nil)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func HandleGameCommand(w http.ResponseWriter, r *http.Request) {
-	// Only POST requests are allowed
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST requests are allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Decode the request body into a Command struct
-	command := r.FormValue("command")
-	if command == "" {
-		http.Error(w, "Missing command", http.StatusBadRequest)
-		return
-	}
-
-	userValue := r.Context().Value("user")
-	if userValue == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	user := userValue.(*auth.User)
-
-	resultMsg, err := ProcessGameCommand(r.Context(), command, user.Email)
-	if err != nil {
-		w.Header().Set("Content-Type", "text/html")
-		executeTemplate(w, "templates/error-update.html", "game-update", resultMsg)
-	} else {
-		w.Header().Set("HX-Trigger-After-Settle", "stats-update")
-		w.Header().Set("Content-Type", "text/html")
-
-		executeTemplate(w, "templates/game-update.html", "game-update", struct {
-			PlayerCommand      string
-			GameMasterResponse string
-		}{
-			PlayerCommand:      command,
-			GameMasterResponse: resultMsg,
-		})
-	}
-}
-
 func ServeGameStats(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Only GET requests are allowed", http.StatusMethodNotAllowed)
@@ -91,9 +28,16 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only GET requests are allowed", http.StatusMethodNotAllowed)
 	}
 
-	username := r.Context().Value("username").(string)
+	// get user from context
+	user := r.Context().Value("user")
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
-	g, err := LoadGameFromRedis(r.Context(), username)
+	email := user.(*auth.User).Email
+
+	g, err := LoadGameFromRedis(r.Context(), email)
 	if err != nil {
 		http.Error(w, "Error loading game from redis", http.StatusInternalServerError)
 		return

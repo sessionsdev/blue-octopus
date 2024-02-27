@@ -29,10 +29,12 @@ func initializeAdminRoutes() {
 
 // intialize the ai adventure game routes
 func initializeGameRoutes() {
-	http.Handle("/game", RequestLoggerMiddleware(http.HandlerFunc(game.ServeGamePage)))
-	http.Handle("/game/process-command", auth.AuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(game.HandleGameCommand))))
+	// http.Handle("/game", RequestLoggerMiddleware(http.HandlerFunc(game.ServeGamePage)))
+	// http.Handle("/game/process-command", auth.AuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(game.HandleGameCommand))))
 	http.Handle("/game/game-state", auth.AuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(game.HandleGameState))))
-	http.Handle("/game/stats-display", RequestLoggerMiddleware(http.HandlerFunc(game.ServeGameStats)))
+	// http.Handle("/game/stats-display", RequestLoggerMiddleware(http.HandlerFunc(game.ServeGameStats)))
+	http.Handle("/game-web-socket", auth.AdminAuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(game.HandleGameWebSocket))))
+	http.Handle("/game", auth.AdminAuthMiddleware(RequestLoggerMiddleware(http.HandlerFunc(game.ServeGamePage))))
 }
 
 // intialize api routes
