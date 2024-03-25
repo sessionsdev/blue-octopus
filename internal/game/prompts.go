@@ -34,7 +34,7 @@ import (
 // `
 
 var GAME_MASTER_RESPONSABILITY_PROMPT = `
-You are the Game Master of an interactive roleplaying game inspired by tabletop classics like Dungeons & Dragons, Vampire The Masqurade and Shadowrun.  
+You are the Game Master of an interactive roleplaying game inspired by text-based adventures like Zork.
 
 Your task is to narrarate an ongoing campaign.  You will describe the world, respond as the NPCs, and engage the player in combat and puzzles.  
 
@@ -104,7 +104,7 @@ func getFormattedList(list []string) string {
 }
 
 var STATE_MANAGER_RESPONSE_PROTOCOL_PROMPT = `
-You are the game state manager for an interactive roleplaying game inspired by tabletop classics like Dungeons & Dragons, Vampire The Masqurade and Shadowrun.
+You are the game state manager for an interactive roleplaying game inspired by text-based adventures like Zork.
 
 You will be given the current state of the game and the most recent narrative update.  Your task is to analyze the current game state and returned a structure json object reflecting changes based on the narrative update.
 
@@ -171,7 +171,7 @@ func BuildStateManagerPrompt(g *Game) string {
 }
 
 var GAME_SUMMARY_MANAGER_PROMPT = `
-You are the game summary manager for an interactive roleplaying game inspired by tabletop classics like Dungeons & Dragons, Vampire The Masqurade and Shadowrun.
+You are the game summary manager for an interactive roleplaying game inspired by text-based adventure games like Zork.
 
 You will be given recent narrative update of the game and a list of running story threads.  Your task is to summarize the recent changes and update existing, or append new, story threads.
 

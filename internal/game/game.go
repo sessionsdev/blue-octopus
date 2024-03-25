@@ -56,6 +56,7 @@ func BuildNewGame(details NewGameDetails) *Game {
 		},
 		GameMessageHistory: []GameMessage{},
 		TotalTokensUsed:    0,
+		StoryThreads:       []string{},
 	}
 
 	// Add the starting location to the world

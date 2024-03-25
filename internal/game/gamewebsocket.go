@@ -49,13 +49,6 @@ func HandleGameWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userEmail := user.(*auth.User).Email
-	g, err := LoadGameFromRedis(r.Context(), userEmail)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
 	// Upgrade initial GET request to a WebSocket
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -83,7 +76,7 @@ func HandleGameWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// handle the message
-		err = handleMessage(r.Context(), socketResponse, g, ws, messageType)
+		err = handleMessage(r.Context(), socketResponse, ws, messageType)
 		if err != nil {
 			log.Println(err)
 			return
@@ -91,7 +84,9 @@ func HandleGameWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleMessage(ctx context.Context, msg HtmxWebSocketMsg, g *Game, ws *websocket.Conn, messageType int) error {
+func handleMessage(ctx context.Context, msg HtmxWebSocketMsg, ws *websocket.Conn, messageType int) error {
+	log.Println("Received message:", msg)
+
 	// Get user form context
 	user := ctx.Value("user")
 	if user == nil {
@@ -99,18 +94,7 @@ func handleMessage(ctx context.Context, msg HtmxWebSocketMsg, g *Game, ws *webso
 	}
 
 	userEmail := user.(*auth.User).Email
-
-	g.Processing = false
-
-	if g.Processing {
-		html := wrapGameOutputDiv(`
-			<p>[ERROR]: game command processing is already in progress. Please wait a moment and try again.</p>
-		`)
-		writeMessageAndHandleError(ws, messageType, []byte(html))
-		return nil
-	}
-
-	g.Processing = true
+	var g *Game
 
 	switch msg.Prompt {
 	case "RESET GAME":
@@ -132,58 +116,80 @@ func handleMessage(ctx context.Context, msg HtmxWebSocketMsg, g *Game, ws *webso
 
 	default:
 		// echo back a formatted message
-		html := wrapGameOutputDiv(fmt.Sprintf(`
+		// Reconcile the game state
+		// Save the game state
+		// Write message back to browser
+		return handlePlayerPrompt(ctx, msg, ws, messageType, g, userEmail)
+	}
+}
+
+func handlePlayerPrompt(ctx context.Context, msg HtmxWebSocketMsg, ws *websocket.Conn, messageType int, g *Game, userEmail string) error {
+	// Get the game from redis
+	g, err := LoadGameFromRedis(ctx, userEmail)
+	if err != nil {
+		return err
+	}
+
+	if g.Processing {
+		html := wrapGameOutputDiv(`
+			<p>[ERROR]: game command processing is already in progress. Please wait a moment and try again.</p>
+		`)
+		writeMessageAndHandleError(ws, messageType, []byte(html))
+		return nil
+	}
+
+	g.Processing = true
+
+	html := wrapGameOutputDiv(fmt.Sprintf(`
 			<p>[PLAYER]: %s </p>
 		`, msg.Prompt))
 
-		writeMessageAndHandleError(ws, messageType, []byte(html))
+	writeMessageAndHandleError(ws, messageType, []byte(html))
 
-		narrativeResponse, err := g.ProcessPlayerPrompt(string(msg.Prompt))
-		if err != nil {
-			html := wrapGameOutputDiv(fmt.Sprintf(`
+	narrativeResponse, err := g.ProcessPlayerPrompt(string(msg.Prompt))
+	if err != nil {
+		html := wrapGameOutputDiv(fmt.Sprintf(`
 				<p>[ERROR]: %s</p>
 			`, err.Error()))
 
-			writeMessageAndHandleError(ws, messageType, []byte(html))
-			return nil
-		}
-
-		done := make(chan bool)
-
-		go func() {
-			// Reconcile the game state
-			writeMessageAndHandleError(ws, messageType, []byte(formatStatsPanelHtml(`<img src="static/svg-loaders/puff.svg" alt="">`)))
-			g.reconcileGameState()
-			g.populatePreparedStatsCache()
-			html, err := getTemplateHtml("templates/stats-panel.html", "stats-panel", PreparedStatsCache)
-			if err != nil {
-				log.Println(err)
-			}
-
-			writeMessageAndHandleError(ws, messageType, []byte(formatStatsPanelHtml(html)))
-			done <- true
-		}()
-
-		go func() {
-			// Save the game state
-			g.progressStoryThreads()
-			done <- true
-		}()
-
-		go func() {
-			<-done
-			<-done
-			SaveGameToRedis(ctx, g, userEmail)
-			g.Processing = false
-		}()
-
-		html = wrapGameOutputDiv(fmt.Sprintf(`<p>[GAME MASTER]: %s</p>`, narrativeResponse))
-
-		// Write message back to browser
 		writeMessageAndHandleError(ws, messageType, []byte(html))
-
 		return nil
 	}
+
+	done := make(chan bool)
+
+	go func() {
+
+		writeMessageAndHandleError(ws, messageType, []byte(formatStatsPanelHtml(`<img src="static/svg-loaders/puff.svg" alt="">`)))
+		g.reconcileGameState()
+		g.populatePreparedStatsCache()
+		html, err := getTemplateHtml("templates/stats-panel.html", "stats-panel", PreparedStatsCache)
+		if err != nil {
+			log.Println(err)
+		}
+
+		writeMessageAndHandleError(ws, messageType, []byte(formatStatsPanelHtml(html)))
+		done <- true
+	}()
+
+	go func() {
+
+		g.progressStoryThreads()
+		done <- true
+	}()
+
+	go func() {
+		<-done
+		<-done
+		g.Processing = false
+		SaveGameToRedis(ctx, g, userEmail)
+	}()
+
+	html = wrapGameOutputDiv(fmt.Sprintf(`<p>[GAME MASTER]: %s</p>`, narrativeResponse))
+
+	writeMessageAndHandleError(ws, messageType, []byte(html))
+
+	return nil
 }
 
 var writelock sync.Mutex
