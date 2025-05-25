@@ -1,0 +1,296 @@
+{{define "title"}}Willis T. Pettijohn - SessionsDev{{end}}
+
+{{define "main"}}
+<style>
+.memorial-page {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.hero {
+    text-align: center;
+    margin-bottom: var(--spacing);
+}
+
+.hero img {
+    max-width: 400px;
+    width: 100%;
+    height: auto;
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing);
+}
+
+.service-info {
+    text-align: center;
+    margin-bottom: var(--spacing);
+}
+
+.letter-section {
+    margin: var(--spacing) 0;
+    padding: var(--spacing);
+    border-radius: var(--border-radius);
+    background: var(--card-sectionning-background-color);
+}
+
+.letter-content {
+    font-family: var(--font-family);
+    line-height: 1.6;
+    max-width: 650px;
+    margin: 0 auto;
+}
+
+.letter-header {
+    margin-bottom: var(--spacing);
+}
+
+.letter-address {
+    margin-bottom: var(--spacing);
+}
+
+.letter-body p {
+    margin-bottom: calc(var(--spacing) * 0.75);
+    text-align: justify;
+}
+
+.letter-signature {
+    margin-top: var(--spacing);
+}
+
+.photos-section {
+    margin-top: var(--spacing);
+}
+
+.photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: calc(var(--spacing) * 0.5);
+}
+
+.photo-item {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 0.25);
+}
+
+.photo-item img {
+    width: 100%;
+    height: auto;
+    border-radius: var(--border-radius);
+    transition: transform 0.2s ease;
+    cursor: pointer;
+}
+
+.photo-item img:hover {
+    transform: scale(1.02);
+}
+
+.photo-caption {
+    font-size: 0.9em;
+    text-align: center;
+    color: var(--muted-color);
+}
+
+.photo-modal {
+    max-width: 90vw;
+    max-height: 90vh;
+    padding: 0;
+    border: none;
+}
+
+.photo-modal::backdrop {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.modal-content {
+    position: relative;
+    padding: 0;
+}
+
+.modal-content img {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
+}
+
+.modal-caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: var(--spacing);
+    text-align: center;
+}
+
+.close-modal {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    padding: 0;
+    line-height: 1;
+}
+
+.close-modal:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+@media (max-width: 600px) {
+    .memorial-page {
+        padding: var(--spacing);
+    }
+}
+</style>
+
+<article class="memorial-page">
+    <section class="hero">
+        <hgroup>
+            <h1>Willis T. Pettijohn</h1>
+            <br>
+            <h3>393rd Regiment 99th Infantry Division</h2>
+            <h4>May 9, 1920 - March 28, 1945</h3>
+        </hgroup>
+        <br>
+        
+        <img src="/static/images/pettijohn-in-uniform.jpg" alt="Willis T. Pettijohn in uniform">
+        <br>
+        <br>
+        
+        <p>Willis T. Pettijohn was my great-grandfather who served, was captured, and died in World War II.</p>
+        <p>Below are some photos including a letter to his wife from a fellow POW describing how he died.</p>
+        <hr>
+    </section>
+
+    <section class="letter-section">
+        <h3 style="text-align: center;">The Letter from Captain Crocker to Mrs. Pettijohn</h3>
+        <article class="letter-content">
+            <div class="letter-header">
+                <div class="letter-address">
+                    <p><strong>Addressed to:</strong></p>
+                    <p>Mrs. Dena Pettijohn<br>
+                    3330 E. Rosedale<br>
+                    Fort Worth, Tex.</p>
+                    <br>
+                    <p><strong>From:</strong></p>
+                    <p>Captain John S. Crocker<br>
+                    0524827<br>
+                    Ward 20C<br>
+                    Lawson General Hospital<br>
+                    Chamblee, Ga.</p>
+                </div>
+                <br>
+                <p>Dear Mrs. Pettijohn,</p>
+            </div>
+
+            <div class="letter-body">
+                <p>Your letter reached me recently after several forwardings. I believe I can give you some of the information you desire.</p>
+                <br>
+                <p>When the tanks and other vehicles left camp to return to our lines a number of us rode the outside of the vehicles. Lt. Pettijohn drew the lead tank. A few miles from the camp, the column ran into a German roadblock. The first shot of a German bazooka struck the lead tank, killing four persons, your husband included. The others were 2 POW officers and an enlisted man from the rear of the column. It was pitch dark at the time, and I did not know where we were.</p>
+                <br>
+                <p>After several other occurrences I was recaptured with a few others and taken to a small town called Gillbeck (it is on the road from Hammelburg to Gemunden, about 7 kilometers south of Hammelburg). It is little more than a crossroads. The German in charge told me that there were four Americans there who had been killed in the fight the evening before. Then I realized that we had returned to the roadblock.</p>
+                <br>
+                <p>I took several enlisted men, borrowed some shovels, and went to bury them. I was able to identify them all positively. By the nature of their wounds I am certain all died instantly.</p>
+                <br>
+                <p>We buried them near the junction of a little creek and the highway, making each grave with a cross with the name written in indelible pencil. The graves are very noticeable from the highway and will undoubtedly be found by units organized for that purpose. Nothing was removed from the bodies because I felt it would be more valuable on the body as an aid in identification.</p>
+                <br>
+                <p>As soon as I had the chance I turned over full details to two other officers with instructions to report the matter if they survived. I made a full report at Le Havre and later at the placement of the matter.</p>
+                <br>
+                <p>Lt. Pettijohn and I lived in the same room at Hammelburg for about 3 months. He was one of the definitely good people there and I grew to be very fond of him. We often spoke of you and looked forward eagerly to being reunited with you.</p>
+                <br>
+                <p>If your surmise that the date of your husband's death was on 28 March is correct, it was very early in the morning.</p>
+                <br>
+                <p>I wish I could say something to comfort you in your loss but words are inadequate. Please feel free to call on me at any time for any information you wish that I might have.</p>
+            </div>
+
+            <div class="letter-signature">
+                <br>
+                <p>Yours truly,<br>
+                John S. Crocker<br>
+                Capt. 29th</p>
+            </div>
+        </article>
+    </section>
+    <hr>
+
+    <section class="photos-section">
+        <h2>Photos</h2>
+        <div class="photos-grid">
+            <div class="photo-item">
+                <img src="/static/images/pettijohn-letter-1.jpg" alt="Willis T. Pettijohn Letter Page 1" onclick="openModal(this)">
+                <span class="photo-caption">First page of Captain Crocker's letter</span>
+            </div>
+            <div class="photo-item">
+                <img src="/static/images/pettijohn-letter-2.jpg" alt="Willis T. Pettijohn Letter Page 2" onclick="openModal(this)">
+                <span class="photo-caption">Second page of Captain Crocker's letter</span>
+            </div>
+            <div class="photo-item">
+                <img src="/static/images/pettijohn-letter-3.jpg" alt="Willis T. Pettijohn Letter Page 3" onclick="openModal(this)">
+                <span class="photo-caption">Third page of Captain Crocker's letter</span>
+            </div>
+            <div class="photo-item">
+                <img src="/static/images/pettijohn-grave-site.jpg" alt="Willis T. Pettijohn Grave Site" onclick="openModal(this)">
+                <span class="photo-caption">Lt. Pettijohn's grave site</span>
+            </div>
+            <div class="photo-item">
+                <img src="/static/images/pettijohn-honor-roll.jpg" alt="Willis T. Pettijohn Honor Roll" onclick="openModal(this)">
+                <span class="photo-caption">Honor Roll memorial</span>
+            </div>
+        </div>
+    </section>
+</article>
+
+<dialog class="photo-modal">
+    <div class="modal-content">
+        <img src="" alt="">
+        <div class="modal-caption"></div>
+        <button class="close-modal" onclick="closeModal(this)">&times;</button>
+    </div>
+</dialog>
+
+<script>
+function openModal(img) {
+    const modal = document.querySelector('.photo-modal');
+    const modalImg = modal.querySelector('img');
+    const modalCaption = modal.querySelector('.modal-caption');
+    const caption = img.nextElementSibling.textContent;
+
+    modalImg.src = img.src;
+    modalImg.alt = img.alt;
+    modalCaption.textContent = caption;
+    modal.showModal();
+}
+
+function closeModal() {
+    const modal = document.querySelector('.photo-modal');
+    modal.close();
+}
+
+// Close modal when clicking outside the image
+document.querySelector('.photo-modal').addEventListener('click', function(event) {
+    if (event.target === this) {
+        this.close();
+    }
+});
+
+// Close modal with escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.querySelector('.photo-modal');
+        if (modal.open) {
+            modal.close();
+        }
+    }
+});
+</script>
+{{end}}

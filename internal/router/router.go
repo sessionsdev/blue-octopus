@@ -46,6 +46,7 @@ func initializeApiRoutes() {
 // intialize the public routes
 func initializeWebRoutes() {
 	http.Handle("/", RequestLoggerMiddleware(http.HandlerFunc(profile.ServeHome)))
+	http.Handle("/pettijohn", RequestLoggerMiddleware(http.HandlerFunc(profile.ServePettijohnProfile)))
 }
 
 // intialize the auth routes
